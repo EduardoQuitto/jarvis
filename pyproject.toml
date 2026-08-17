@@ -24,6 +24,9 @@ dev = [
     "pytest-asyncio>=0.23.0",
 ]
 
+[tool.setuptools.packages.find]
+include = ["core*", "tools*", "security*", "memory*", "server*", "windows_agent*"]
+
 [tool.pytest.ini_options]
 minversion = "7.0"
 addopts = "-ra -q"
