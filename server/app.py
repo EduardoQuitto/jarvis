@@ -8,6 +8,7 @@ from core.config import get_settings
 from tools.registry import get_tool_registry
 from tools import register_default_tools
 from server.routers.health import router as health_router
+from server.routers.system import router as system_router
 from server.routers.tools import router as tools_router
 
 
@@ -47,6 +48,7 @@ def create_app() -> FastAPI:
 
     # Register API routers
     app.include_router(health_router)
+    app.include_router(system_router)
     app.include_router(tools_router)
 
     return app
