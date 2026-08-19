@@ -38,6 +38,19 @@ class Settings(BaseSettings):
     # Storage & Persistence
     db_path: str = Field(default="./data/jarvis.db", description="Path to SQLite database file")
 
+    # LLM Configuration
+    llm_provider: str = Field(default="ollama", description="LLM provider: ollama, openai, mock")
+    llm_model: str = Field(default="qwen2.5:7b", description="Model name to use")
+    llm_base_url: str = Field(default="http://localhost:11434", description="LLM API base URL")
+    llm_api_key: str = Field(default="", description="API key for cloud LLM providers")
+    llm_max_tokens: int = Field(default=4096, description="Max tokens for LLM responses")
+    llm_temperature: float = Field(default=0.7, description="LLM temperature")
+    llm_timeout: float = Field(default=120.0, description="LLM request timeout in seconds")
+
+    # Ollama-specific
+    ollama_host: str = Field(default="http://localhost:11434", description="Ollama server URL")
+    ollama_model: str = Field(default="qwen2.5:7b", description="Ollama model name")
+
     # Logging
     log_level: str = Field(default="INFO", description="Logging level")
 

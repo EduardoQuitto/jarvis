@@ -10,6 +10,11 @@ from tools import register_default_tools
 from server.routers.health import router as health_router
 from server.routers.system import router as system_router
 from server.routers.tools import router as tools_router
+from server.routers.chat import router as chat_router
+from server.routers.tasks import router as tasks_router
+from server.routers.devices import router as devices_router
+from server.routers.memory import router as memory_router
+from server.routers.mcp import router as mcp_router
 
 
 @asynccontextmanager
@@ -50,5 +55,10 @@ def create_app() -> FastAPI:
     app.include_router(health_router)
     app.include_router(system_router)
     app.include_router(tools_router)
+    app.include_router(chat_router)
+    app.include_router(tasks_router)
+    app.include_router(devices_router)
+    app.include_router(memory_router)
+    app.include_router(mcp_router)
 
     return app
