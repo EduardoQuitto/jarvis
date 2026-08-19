@@ -69,7 +69,7 @@ class MockLLMProvider(BaseLLMProvider):
                 content=None,
                 tool_calls=[
                     LLMToolCall(
-                        id=f"call_{uuid.uuid4().hex[:8]}",
+                        id=f"call-{uuid.uuid4().hex[:8]}",
                         type="function",
                         function=LLMFunctionCall(
                             name="echo",

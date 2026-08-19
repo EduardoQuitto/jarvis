@@ -68,4 +68,4 @@ def tool_result_to_message(
 
 def create_tool_call_id() -> str:
     """Generate a unique ID for a tool call."""
-    return f"call_{uuid.uuid4().hex[:12]}"
+    return f"call-{uuid.uuid4().hex[:8]}"
