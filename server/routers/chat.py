@@ -1,7 +1,7 @@
 """Chat API Router — /api/chat endpoints for orchestrator interaction."""
 
 from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from core.contracts.orchestrator import (
@@ -9,8 +9,9 @@ from core.contracts.orchestrator import (
     OrchestratorResponse,
 )
 from core.orchestrator.engine import Orchestrator
-from core.llm.provider import OllamaProvider
+from core.llm.factory import create_llm_provider, create_router
 from core.logger import get_logger
+from security.auth import optional_node_auth
 
 logger = get_logger("jarvis.api.chat")
 
@@ -23,8 +24,8 @@ _orchestrator: Optional[Orchestrator] = None
 def _get_orchestrator() -> Orchestrator:
     global _orchestrator
     if _orchestrator is None:
-        llm = OllamaProvider()
-        _orchestrator = Orchestrator(llm_provider=llm)
+        router_instance = create_router()
+        _orchestrator = Orchestrator(router=router_instance)
     return _orchestrator
 
 
@@ -47,7 +48,10 @@ class ChatResponse(BaseModel):
 
 
 @router.post("/send", response_model=ChatResponse)
-async def send_message(request: ChatRequest) -> ChatResponse:
+async def send_message(
+    request: ChatRequest,
+    _token: str = Depends(optional_node_auth),
+) -> ChatResponse:
     """Send a message to the JARVIS orchestrator."""
     try:
         orchestrator = _get_orchestrator()
@@ -92,7 +96,10 @@ class ConfirmRequest(BaseModel):
 
 
 @router.post("/confirm")
-async def confirm_action(request: ConfirmRequest) -> Dict[str, Any]:
+async def confirm_action(
+    request: ConfirmRequest,
+    _token: str = Depends(optional_node_auth),
+) -> Dict[str, Any]:
     """Approve or deny a pending confirmation."""
     from core.orchestrator.confirmation import get_confirmation_manager
 
@@ -106,7 +113,9 @@ async def confirm_action(request: ConfirmRequest) -> Dict[str, Any]:
 
 
 @router.get("/confirm/pending")
-async def list_pending_confirmations() -> List[Dict[str, Any]]:
+async def list_pending_confirmations(
+    _token: str = Depends(optional_node_auth),
+) -> List[Dict[str, Any]]:
     """List all pending confirmation requests."""
     from core.orchestrator.confirmation import get_confirmation_manager
 

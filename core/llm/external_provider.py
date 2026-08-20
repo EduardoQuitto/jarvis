@@ -1,7 +1,10 @@
-"""Ollama LLM Provider — connects to Ollama's OpenAI-compatible API via httpx."""
+"""External LLM Provider — connects to any OpenAI-compatible API via httpx.
+
+Supports Groq, Together AI, OpenRouter, Google Gemini, and any other
+provider that implements the OpenAI /v1/chat/completions format.
+"""
 
 import json
-import asyncio
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
 import httpx
@@ -19,14 +22,19 @@ from core.contracts.llm import (
 from core.config import get_settings
 from core.logger import get_logger
 
-logger = get_logger("jarvis.llm.ollama")
+logger = get_logger("jarvis.llm.external")
 
 
-class OllamaProvider(BaseLLMProvider):
-    """LLM provider that communicates with Ollama via its OpenAI-compatible endpoint.
+class ExternalProvider(BaseLLMProvider):
+    """LLM provider that communicates with any OpenAI-compatible API.
 
-    Requires Ollama running on the configured host/port (default: localhost:11434).
-    Supports both generation and streaming with structured tool calling.
+    Works with Groq, Together AI, OpenRouter, Google Gemini, and any
+    provider that exposes a /v1/chat/completions endpoint.
+
+    Configuration via environment variables:
+        JARVIS_EXTERNAL_LLM_API_KEY  — API key for the provider
+        JARVIS_EXTERNAL_LLM_BASE_URL — API base URL (e.g. https://api.groq.com/openai/v1)
+        JARVIS_EXTERNAL_LLM_MODEL    — Model name (e.g. llama-3.1-8b-instant)
     """
 
     def __init__(
@@ -34,23 +42,28 @@ class OllamaProvider(BaseLLMProvider):
         base_url: Optional[str] = None,
         model: Optional[str] = None,
         api_key: Optional[str] = None,
-        timeout: float = 120.0,
+        timeout: float = 60.0,
+        provider_name: str = "external",
     ):
         settings = get_settings()
-        raw_url = base_url or settings.llm_base_url
-        self.base_url = raw_url.rstrip("/") + "/v1"
-        self.model = model or settings.llm_model
-        self.api_key = api_key or settings.llm_api_key or "ollama"
+        self.base_url = (base_url or settings.external_llm_base_url).rstrip("/")
+        self.model = model or settings.external_llm_model
+        self.api_key = api_key or settings.external_llm_api_key
         self.timeout = timeout
+        self._provider_name = provider_name or settings.external_llm_provider or "external"
+
+        if not self.base_url:
+            logger.warning("ExternalProvider: no base_url configured")
+        if not self.api_key:
+            logger.warning("ExternalProvider: no api_key configured")
 
     def _build_headers(self) -> Dict[str, str]:
-        return {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {self.api_key}",
-        }
+        headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+        return headers
 
     def _messages_to_dicts(self, messages: List[LLMMessage]) -> List[Dict[str, Any]]:
-        """Convert LLMMessage models to API-compatible dicts."""
         result = []
         for msg in messages:
             d: Dict[str, Any] = {"role": msg.role, "content": msg.content}
@@ -61,7 +74,9 @@ class OllamaProvider(BaseLLMProvider):
                         "type": tc.type,
                         "function": {
                             "name": tc.function.name,
-                            "arguments": json.dumps(tc.function.arguments),
+                            "arguments": json.dumps(tc.function.arguments)
+                            if isinstance(tc.function.arguments, dict)
+                            else tc.function.arguments,
                         },
                     }
                     for tc in msg.tool_calls
@@ -74,7 +89,6 @@ class OllamaProvider(BaseLLMProvider):
         return result
 
     def _tools_to_dicts(self, tools: Optional[List[LLMToolDef]]) -> Optional[List[Dict[str, Any]]]:
-        """Convert LLMToolDef models to API-compatible dicts."""
         if not tools:
             return None
         return [
@@ -90,7 +104,6 @@ class OllamaProvider(BaseLLMProvider):
         ]
 
     def _parse_response(self, data: Dict[str, Any]) -> LLMResponse:
-        """Parse a non-streaming Ollama/OpenAI response into LLMResponse."""
         choice = data.get("choices", [{}])[0]
         message = choice.get("message", {})
 
@@ -134,11 +147,17 @@ class OllamaProvider(BaseLLMProvider):
         temperature: float = 0.7,
         max_tokens: Optional[int] = None,
     ) -> LLMResponse:
-        """Generate a complete response from Ollama."""
+        if not self.base_url:
+            return LLMResponse(
+                content=None,
+                tool_calls=[],
+                finish_reason="stop",
+                error_msg="External provider not configured: no base_url set",
+            )
+
         payload: Dict[str, Any] = {
             "model": self.model,
             "messages": self._messages_to_dicts(messages),
-            "stream": False,
             "temperature": temperature,
         }
         tools_dicts = self._tools_to_dicts(tools)
@@ -157,28 +176,28 @@ class OllamaProvider(BaseLLMProvider):
                 resp.raise_for_status()
                 return self._parse_response(resp.json())
         except httpx.ConnectError:
-            logger.error("Cannot connect to Ollama at %s", self.base_url)
+            logger.error("Cannot connect to external provider at %s", self.base_url)
             return LLMResponse(
                 content=None,
                 tool_calls=[],
                 finish_reason="stop",
-                error_msg="Ollama is not reachable",
+                error_msg=f"External provider not reachable: {self.base_url}",
             )
         except httpx.HTTPStatusError as e:
-            logger.error("Ollama HTTP error %s: %s", e.response.status_code, e.response.text[:200])
+            logger.error("External provider HTTP error %s: %s", e.response.status_code, e.response.text[:200])
             return LLMResponse(
                 content=None,
                 tool_calls=[],
                 finish_reason="stop",
-                error_msg=f"Ollama HTTP error: {e.response.status_code}",
+                error_msg=f"External provider HTTP error: {e.response.status_code}",
             )
         except Exception as e:
-            logger.error("Ollama generation error: %s", str(e))
+            logger.error("External provider error: %s", str(e))
             return LLMResponse(
                 content=None,
                 tool_calls=[],
                 finish_reason="stop",
-                error_msg=f"Ollama error: {str(e)}",
+                error_msg=f"External provider error: {str(e)}",
             )
 
     async def generate_stream(
@@ -188,7 +207,10 @@ class OllamaProvider(BaseLLMProvider):
         temperature: float = 0.7,
         max_tokens: Optional[int] = None,
     ) -> AsyncGenerator[StreamChunk, None]:
-        """Stream a response from Ollama chunk by chunk."""
+        if not self.base_url:
+            yield StreamChunk(content_delta="", finish_reason="stop")
+            return
+
         payload: Dict[str, Any] = {
             "model": self.model,
             "messages": self._messages_to_dicts(messages),
@@ -251,23 +273,25 @@ class OllamaProvider(BaseLLMProvider):
                         except json.JSONDecodeError:
                             continue
         except Exception as e:
-            logger.error("Ollama streaming error: %s", str(e))
+            logger.error("External provider streaming error: %s", str(e))
             yield StreamChunk(content_delta="", finish_reason="stop")
 
     async def health_check(self) -> bool:
-        """Check if Ollama is reachable."""
+        if not self.base_url or not self.api_key:
+            return False
         try:
-            tags_url = self.base_url.replace("/v1", "") + "/api/tags"
             async with httpx.AsyncClient(timeout=5.0) as client:
-                resp = await client.get(tags_url)
+                resp = await client.get(
+                    f"{self.base_url}/models",
+                    headers=self._build_headers(),
+                )
                 return resp.status_code == 200
         except Exception:
             return False
 
     def get_model_info(self) -> Dict[str, Any]:
-        """Return configuration info about the model."""
         return {
-            "provider": "ollama",
+            "provider": self._provider_name,
             "model": self.model,
             "base_url": self.base_url,
         }

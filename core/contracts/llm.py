@@ -54,6 +54,7 @@ class LLMResponse(BaseModel):
     finish_reason: str = Field(default="stop", description="stop, tool_calls, or length")
     usage: Optional[LLMUsage] = Field(default=None, description="Token usage")
     model: str = Field(default="", description="Model that generated the response")
+    error_msg: Optional[str] = Field(default=None, description="Error message if the provider failed")
 
 
 class StreamChunk(BaseModel):

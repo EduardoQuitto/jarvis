@@ -33,13 +33,27 @@
 - [x] Executor sequencial e orientado a dependências `PlanExecutor`.
 - [x] Pausa automática de planos para aprovação de usuário (`REQUIRE_APPROVAL`).
 
+### ✅ Fase 7: Intelligence Router & Multi-Provider (Concluída)
+- [x] `ExternalProvider` — provedor LLM externo compatível com OpenAI (`core/llm/external_provider.py`).
+- [x] `ProviderRegistry` — registro, cache de saúde e seleção de candidatos (`core/llm/registry.py`).
+- [x] `IntelligenceRouter` — roteamento com fallback, circuit breaker e scoring (`core/llm/router.py`).
+- [x] `CircuitBreaker` — proteção contra chamadas repetidas a provedores com falha.
+- [x] Fábrica de provedores estendida com `"external"` e `create_router()` (`core/llm/factory.py`).
+- [x] Configuração de provedor externo via variáveis de ambiente (`core/config.py`).
+- [x] Orchestrator aceita `IntelligenceRouter` ou `BaseLLMProvider` (compatibilidade retroativa).
+- [x] Chat API usa `IntelligenceRouter` por padrão.
+- [x] Eventos `PROVIDER_SELECTED`, `PROVIDER_FAILED`, `ROUTING_STARTED` no EventBus.
+- [x] 41 novos testes (total: 110 testes, 0 falhas, 0 warnings).
+
 ---
 
 ### ⏳ Próximas Fases (Futuras)
 
-* **Fase 7: Integração Home Assistant** (Scheduler, automações e Wake-on-LAN no JARVIS Server).
-* **Fase 8: IA & LLM Provider Abstrato** (Integração com Ollama / llama.cpp no JARVIS Core).
-* **Fase 9: Pipeline de Voz Local** (Wake Word -> VAD -> Whisper -> TTS Piper).
-* **Fase 10: Android & Tablet Dashboard** (Home Assistant Companion + painel HTML ultraleve).
-* **Fase 11: Visão Computacional** (Captura de tela, OCR e análise visual local).
-* **Fase 12: Memória Vetorial & Busca Semântica** (Embeddings locais no i5-14400).
+* **Fase 8: Streaming de Respostas** (SSE streaming do Orchestrator para UI, chunks de texto em tempo real).
+* **Fase 9: Persistência de Conversas** (Garantir que conversas sobrevivam a restarts do servidor — já parcialmente implementado via SQLite).
+* **Fase 10: Segurança de Produção** (CORS, rate limiting, validação de chave de API em produção).
+* **Fase 11: Integração Home Assistant** (Scheduler, automações e Wake-on-LAN no JARVIS Server).
+* **Fase 12: Pipeline de Voz Local** (Wake Word -> VAD -> Whisper -> TTS Piper).
+* **Fase 13: Android & Tablet Dashboard** (Home Assistant Companion + painel HTML ultraleve).
+* **Fase 14: Visão Computacional** (Captura de tela, OCR e análise visual local).
+* **Fase 15: Memória Vetorial & Busca Semântica** (Embeddings locais no i5-14400).

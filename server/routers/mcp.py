@@ -1,11 +1,12 @@
 """MCP API Router — /api/mcp endpoints for Model Context Protocol."""
 
 from typing import Any, Dict
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from core.mcp.server import get_mcp_server
 from core.logger import get_logger
+from security.auth import optional_node_auth
 
 logger = get_logger("jarvis.api.mcp")
 
@@ -20,7 +21,10 @@ class MCPRequest(BaseModel):
 
 
 @router.post("/", response_model=Dict[str, Any])
-async def handle_mcp_request(request: MCPRequest) -> Dict[str, Any]:
+async def handle_mcp_request(
+    request: MCPRequest,
+    _token: str = Depends(optional_node_auth),
+) -> Dict[str, Any]:
     """Handle an MCP JSON-RPC 2.0 request."""
     try:
         server = get_mcp_server()
@@ -37,7 +41,9 @@ async def handle_mcp_request(request: MCPRequest) -> Dict[str, Any]:
 
 
 @router.get("/tools")
-async def list_mcp_tools() -> Dict[str, Any]:
+async def list_mcp_tools(
+    _token: str = Depends(optional_node_auth),
+) -> Dict[str, Any]:
     """List all available MCP tools."""
     try:
         server = get_mcp_server()

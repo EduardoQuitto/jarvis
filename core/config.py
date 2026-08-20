@@ -51,6 +51,12 @@ class Settings(BaseSettings):
     ollama_host: str = Field(default="http://localhost:11434", description="Ollama server URL")
     ollama_model: str = Field(default="qwen2.5:7b", description="Ollama model name")
 
+    # External LLM Provider (OpenAI-compatible: Groq, Together, OpenRouter, Gemini)
+    external_llm_api_key: str = Field(default="", description="API key for external LLM provider")
+    external_llm_base_url: str = Field(default="", description="Base URL for external LLM API")
+    external_llm_model: str = Field(default="", description="Model name for external LLM provider")
+    external_llm_provider: str = Field(default="", description="Descriptive name for external provider")
+
     # Logging
     log_level: str = Field(default="INFO", description="Logging level")
 

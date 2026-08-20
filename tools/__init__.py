@@ -14,6 +14,7 @@ from tools.builtin.time_tool import GetCurrentTimeTool
 from tools.builtin.screenshot_tool import ScreenshotTool
 from tools.builtin.memory_tool import SearchMemoryTool
 from tools.builtin.internet_tool import WebSearchTool, FetchUrlTool
+from tools.builtin.task_tool import CreateTaskTool
 
 
 def register_default_tools(registry: ToolRegistry) -> None:
@@ -31,6 +32,7 @@ def register_default_tools(registry: ToolRegistry) -> None:
     registry.register(SearchMemoryTool())
     registry.register(WebSearchTool())
     registry.register(FetchUrlTool())
+    registry.register(CreateTaskTool())
 
 
 __all__ = [
@@ -52,4 +54,5 @@ __all__ = [
     "SearchMemoryTool",
     "WebSearchTool",
     "FetchUrlTool",
+    "CreateTaskTool",
 ]

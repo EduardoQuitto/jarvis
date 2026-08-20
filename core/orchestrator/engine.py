@@ -5,7 +5,7 @@ manages confirmations, and returns structured responses.
 """
 
 import json
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from core.contracts.llm import BaseLLMProvider, LLMMessage, LLMToolDef
 from core.contracts.orchestrator import (
@@ -32,11 +32,15 @@ MAX_TOOL_ITERATIONS = 10
 class Orchestrator:
     """The central brain that processes user messages through the LLM + tool loop.
 
+    Accepts either a BaseLLMProvider (direct) or an IntelligenceRouter (multi-provider).
+    When an IntelligenceRouter is used, the orchestrator benefits from automatic fallback
+    between providers (Ollama → External → Mock).
+
     Flow:
     1. Receive user message
     2. Load conversation context
     3. Build system prompt + tools
-    4. Call LLM
+    4. Call LLM (via provider or router)
     5. If tool_calls → execute → feed results back → loop
     6. If text response → return
     7. Persist everything
@@ -44,17 +48,29 @@ class Orchestrator:
 
     def __init__(
         self,
-        llm_provider: BaseLLMProvider,
+        llm_provider: Optional[BaseLLMProvider] = None,
+        router: Optional[Any] = None,
         conversation_manager: Optional[ConversationManager] = None,
         tool_executor: Optional[ToolExecutor] = None,
         confirmation_manager: Optional[ConfirmationManager] = None,
     ):
         self._llm = llm_provider
+        self._router = router
         self._conversation = conversation_manager or ConversationManager()
         self._tool_executor = tool_executor or ToolExecutor()
         self._confirmations = confirmation_manager or get_confirmation_manager()
         self._context_builder = ContextBuilder()
         self._event_bus = get_event_bus()
+
+    async def _call_llm(
+        self,
+        messages: List[LLMMessage],
+        tools: Optional[List[LLMToolDef]] = None,
+    ):
+        """Call the LLM through whatever backend is configured (provider or router)."""
+        if self._router is not None:
+            return await self._router.route(messages=messages, tools=tools)
+        return await self._llm.generate(messages=messages, tools=tools)
 
     async def process_message(self, request: OrchestratorRequest) -> OrchestratorResponse:
         """Main entry point: process a user message through the agentic loop."""
@@ -126,18 +142,29 @@ class Orchestrator:
             iterations += 1
             logger.info("LLM iteration %d/%d", iterations, MAX_TOOL_ITERATIONS)
 
-            # Call LLM
-            response = await self._llm.generate(messages=messages, tools=tools)
+            # Call LLM (via provider or router)
+            response = await self._call_llm(messages=messages, tools=tools)
+
+            # Handle LLM error
+            if response.error_msg:
+                logger.error("LLM returned error: %s", response.error_msg)
+                final_text = f"I encountered an error: {response.error_msg}"
+                await self._conversation.append_message(session_id, "assistant", final_text)
+                return OrchestratorResponse(
+                    session_id=session_id,
+                    response_text=final_text,
+                    tool_calls_made=all_tool_results,
+                    iterations_used=iterations,
+                    error=response.error_msg,
+                )
 
             # If no tool calls, we have a text response
             if not response.tool_calls:
                 final_text = response.content or ""
-                # Append assistant message to conversation
                 await self._conversation.append_message(session_id, "assistant", final_text)
                 break
 
             # Process tool calls
-            # First, add the assistant message with tool_calls to context
             assistant_msg = LLMMessage(
                 role="assistant",
                 content=response.content or "",
@@ -145,7 +172,6 @@ class Orchestrator:
             )
             messages.append(assistant_msg)
 
-            # Execute each tool call
             for tc in response.tool_calls:
                 tool_name = tc.function.name
                 arguments = tc.function.arguments
@@ -153,7 +179,6 @@ class Orchestrator:
 
                 logger.info("Tool call: %s(%s)", tool_name, json.dumps(arguments)[:100])
 
-                # Publish tool call event
                 await self._event_bus.publish(SystemEvent(
                     event_type=EventType.TOOL_CALL,
                     source="orchestrator",
@@ -161,7 +186,6 @@ class Orchestrator:
                 ))
 
                 # Check policy for confirmation requirement
-                from tools.registry import ToolRegistry
                 tool = registry.get(tool_name)
                 if tool:
                     from security.policy_engine import PolicyEngine
@@ -169,7 +193,6 @@ class Orchestrator:
                     decision = policy.evaluate(tool.metadata, arguments, confirmed=request.confirmed)
 
                     if not decision.allowed and decision.requires_confirmation:
-                        # Need confirmation — pause and return
                         cid = await self._confirmations.request_confirmation(
                             tool_name=tool_name,
                             arguments=arguments,
@@ -189,7 +212,6 @@ class Orchestrator:
                             },
                         ))
 
-                        # Append status message to conversation
                         status_msg = f"[Action requires confirmation: {tool_name}]"
                         await self._conversation.append_message(session_id, "assistant", status_msg)
 
@@ -214,7 +236,6 @@ class Orchestrator:
                 )
                 all_tool_results.append(result)
 
-                # Publish tool result event
                 await self._event_bus.publish(SystemEvent(
                     event_type=EventType.TOOL_RESULT,
                     source="orchestrator",
@@ -226,15 +247,16 @@ class Orchestrator:
                     },
                 ))
 
-                # Add tool result to context
+                # Add tool result to context for LLM
                 from core.llm.converters import tool_result_to_message
                 from core.contracts.tool import ToolResult as TR
+                from core.contracts.enums import SecurityLevel
                 tool_result = TR(
                     success=result.success,
                     data=result.data,
                     error=result.error,
                     execution_time_ms=result.execution_time_ms,
-                    security_level=tool.metadata.security_level if tool else None,
+                    security_level=tool.metadata.security_level if tool else SecurityLevel.GREEN,
                 )
                 tool_msg = tool_result_to_message(tool_name, call_id, tool_result)
                 messages.append(tool_msg)
@@ -243,7 +265,6 @@ class Orchestrator:
             final_text = "I've reached the maximum number of tool call iterations. Please try a simpler request."
             await self._conversation.append_message(session_id, "assistant", final_text)
 
-        # Publish response event
         await self._event_bus.publish(SystemEvent(
             event_type=EventType.ASSISTANT_RESPONSE,
             source="orchestrator",

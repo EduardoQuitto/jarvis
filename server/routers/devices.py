@@ -1,7 +1,7 @@
 """Devices API Router — /api/devices endpoints."""
 
 from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from core.device.registry import DeviceRegistry
@@ -12,6 +12,7 @@ from core.contracts.device import (
     DeviceCapability,
 )
 from core.logger import get_logger
+from security.auth import optional_node_auth
 
 logger = get_logger("jarvis.api.devices")
 
@@ -47,7 +48,10 @@ class HeartbeatRequest(BaseModel):
 
 
 @router.post("/", response_model=Dict[str, Any])
-async def register_device(request: DeviceRegisterRequest) -> Dict[str, Any]:
+async def register_device(
+    request: DeviceRegisterRequest,
+    _token: str = Depends(optional_node_auth),
+) -> Dict[str, Any]:
     """Register a new device."""
     try:
         registry = _get_registry()
@@ -79,7 +83,10 @@ async def register_device(request: DeviceRegisterRequest) -> Dict[str, Any]:
 
 
 @router.post("/heartbeat")
-async def send_heartbeat(request: HeartbeatRequest) -> Dict[str, Any]:
+async def send_heartbeat(
+    request: HeartbeatRequest,
+    _token: str = Depends(optional_node_auth),
+) -> Dict[str, Any]:
     """Send a device heartbeat."""
     try:
         registry = _get_registry()
@@ -104,7 +111,10 @@ async def send_heartbeat(request: HeartbeatRequest) -> Dict[str, Any]:
 
 
 @router.get("/", response_model=List[Dict[str, Any]])
-async def list_devices(device_type: Optional[str] = None) -> List[Dict[str, Any]]:
+async def list_devices(
+    device_type: Optional[str] = None,
+    _token: str = Depends(optional_node_auth),
+) -> List[Dict[str, Any]]:
     """List all devices."""
     try:
         registry = _get_registry()
@@ -127,7 +137,9 @@ async def list_devices(device_type: Optional[str] = None) -> List[Dict[str, Any]
 
 
 @router.get("/online", response_model=List[Dict[str, Any]])
-async def list_online_devices() -> List[Dict[str, Any]]:
+async def list_online_devices(
+    _token: str = Depends(optional_node_auth),
+) -> List[Dict[str, Any]]:
     """List all online devices."""
     try:
         registry = _get_registry()
@@ -147,7 +159,9 @@ async def list_online_devices() -> List[Dict[str, Any]]:
 
 
 @router.get("/summary")
-async def device_summary() -> Dict[str, Any]:
+async def device_summary(
+    _token: str = Depends(optional_node_auth),
+) -> Dict[str, Any]:
     """Get device capability summary."""
     try:
         from core.device.router import CapabilityRouter
@@ -159,7 +173,10 @@ async def device_summary() -> Dict[str, Any]:
 
 
 @router.delete("/{device_id}")
-async def remove_device(device_id: str) -> Dict[str, Any]:
+async def remove_device(
+    device_id: str,
+    _token: str = Depends(optional_node_auth),
+) -> Dict[str, Any]:
     """Remove a device from the registry."""
     try:
         registry = _get_registry()

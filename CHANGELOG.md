@@ -5,6 +5,23 @@ All notable changes to the J.A.R.V.I.S. project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-08-20
+
+### Added
+- **Intelligence Router & Multi-Provider Fallback:**
+  - `ExternalProvider` — OpenAI-compatible LLM provider via HTTP (`core/llm/external_provider.py`).
+  - `ProviderRegistry` — provider registration, health caching with TTL, candidate selection (`core/llm/registry.py`).
+  - `IntelligenceRouter` — priority-based routing with automatic fallback (`core/llm/router.py`).
+  - `CircuitBreaker` — protects against repeated calls to failed providers.
+  - `create_router()` factory function builds IntelligenceRouter from config.
+  - Config fields: `external_llm_api_key`, `external_llm_base_url`, `external_llm_model`, `external_llm_provider`.
+  - EventBus events: `PROVIDER_SELECTED`, `PROVIDER_FAILED`, `PROVIDER_ONLINE`, `PROVIDER_OFFLINE`, `ROUTING_STARTED`.
+  - Orchestrator accepts `router` parameter for backward-compatible routing.
+- **Testing:**
+  - 41 new unit and integration tests (110 total, 0 failures, 0 warnings).
+
+---
+
 ## [0.1.0] - 2026-08-17
 
 ### Added

@@ -4,7 +4,7 @@ import json
 import uuid
 from typing import Dict, List, Optional
 
-from core.contracts.llm import LLMMessage
+from core.contracts.llm import LLMMessage, LLMToolCall
 from core.contracts.conversation import ConversationMessage, ConversationSession
 from memory.sqlite_provider import SQLiteMemoryProvider
 from core.logger import get_logger
@@ -104,8 +104,9 @@ class ConversationManager:
             tool_calls = None
             if msg.tool_calls_json:
                 try:
-                    tool_calls = json.loads(msg.tool_calls_json)
-                except json.JSONDecodeError:
+                    parsed = json.loads(msg.tool_calls_json)
+                    tool_calls = [LLMToolCall.model_validate(tc) for tc in parsed]
+                except (json.JSONDecodeError, Exception):
                     tool_calls = None
             llm_messages.append(
                 LLMMessage(

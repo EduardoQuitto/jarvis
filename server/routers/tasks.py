@@ -1,12 +1,13 @@
 """Tasks API Router — /api/tasks endpoints."""
 
 from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from core.task.manager import TaskManager
 from core.contracts.enums import TaskStatus
 from core.logger import get_logger
+from security.auth import optional_node_auth
 
 logger = get_logger("jarvis.api.tasks")
 
@@ -37,7 +38,10 @@ class TaskUpdateRequest(BaseModel):
 
 
 @router.post("/", response_model=Dict[str, Any])
-async def create_task(request: TaskCreateRequest) -> Dict[str, Any]:
+async def create_task(
+    request: TaskCreateRequest,
+    _token: str = Depends(optional_node_auth),
+) -> Dict[str, Any]:
     """Create a new task."""
     try:
         manager = _get_task_manager()
@@ -59,7 +63,11 @@ async def create_task(request: TaskCreateRequest) -> Dict[str, Any]:
 
 
 @router.get("/", response_model=List[Dict[str, Any]])
-async def list_tasks(status: Optional[str] = None, limit: int = 50) -> List[Dict[str, Any]]:
+async def list_tasks(
+    status: Optional[str] = None,
+    limit: int = 50,
+    _token: str = Depends(optional_node_auth),
+) -> List[Dict[str, Any]]:
     """List tasks."""
     try:
         manager = _get_task_manager()
@@ -81,7 +89,10 @@ async def list_tasks(status: Optional[str] = None, limit: int = 50) -> List[Dict
 
 
 @router.get("/{task_id}", response_model=Dict[str, Any])
-async def get_task(task_id: str) -> Dict[str, Any]:
+async def get_task(
+    task_id: str,
+    _token: str = Depends(optional_node_auth),
+) -> Dict[str, Any]:
     """Get a specific task."""
     try:
         manager = _get_task_manager()
@@ -104,7 +115,11 @@ async def get_task(task_id: str) -> Dict[str, Any]:
 
 
 @router.patch("/{task_id}", response_model=Dict[str, Any])
-async def update_task(task_id: str, request: TaskUpdateRequest) -> Dict[str, Any]:
+async def update_task(
+    task_id: str,
+    request: TaskUpdateRequest,
+    _token: str = Depends(optional_node_auth),
+) -> Dict[str, Any]:
     """Update a task."""
     try:
         manager = _get_task_manager()
@@ -126,7 +141,10 @@ async def update_task(task_id: str, request: TaskUpdateRequest) -> Dict[str, Any
 
 
 @router.post("/{task_id}/cancel")
-async def cancel_task(task_id: str) -> Dict[str, Any]:
+async def cancel_task(
+    task_id: str,
+    _token: str = Depends(optional_node_auth),
+) -> Dict[str, Any]:
     """Cancel a task."""
     try:
         manager = _get_task_manager()
@@ -138,7 +156,10 @@ async def cancel_task(task_id: str) -> Dict[str, Any]:
 
 
 @router.post("/{task_id}/pause")
-async def pause_task(task_id: str) -> Dict[str, Any]:
+async def pause_task(
+    task_id: str,
+    _token: str = Depends(optional_node_auth),
+) -> Dict[str, Any]:
     """Pause a task."""
     try:
         manager = _get_task_manager()
@@ -150,7 +171,10 @@ async def pause_task(task_id: str) -> Dict[str, Any]:
 
 
 @router.post("/{task_id}/resume")
-async def resume_task(task_id: str) -> Dict[str, Any]:
+async def resume_task(
+    task_id: str,
+    _token: str = Depends(optional_node_auth),
+) -> Dict[str, Any]:
     """Resume a paused task."""
     try:
         manager = _get_task_manager()

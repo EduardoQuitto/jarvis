@@ -1,11 +1,12 @@
 """Memory API Router — /api/memory endpoints."""
 
 from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from memory.sqlite_provider import SQLiteMemoryProvider
 from core.logger import get_logger
+from security.auth import optional_node_auth
 
 logger = get_logger("jarvis.api.memory")
 
@@ -33,7 +34,10 @@ class MemorySearchRequest(BaseModel):
 
 
 @router.post("/set")
-async def set_memory(request: MemorySetRequest) -> Dict[str, Any]:
+async def set_memory(
+    request: MemorySetRequest,
+    _token: str = Depends(optional_node_auth),
+) -> Dict[str, Any]:
     """Store a memory entry."""
     try:
         memory = _get_memory()
@@ -45,7 +49,10 @@ async def set_memory(request: MemorySetRequest) -> Dict[str, Any]:
 
 
 @router.get("/get/{key}")
-async def get_memory(key: str) -> Dict[str, Any]:
+async def get_memory(
+    key: str,
+    _token: str = Depends(optional_node_auth),
+) -> Dict[str, Any]:
     """Retrieve a memory entry."""
     try:
         memory = _get_memory()
@@ -61,7 +68,10 @@ async def get_memory(key: str) -> Dict[str, Any]:
 
 
 @router.post("/search")
-async def search_memory(request: MemorySearchRequest) -> Dict[str, Any]:
+async def search_memory(
+    request: MemorySearchRequest,
+    _token: str = Depends(optional_node_auth),
+) -> Dict[str, Any]:
     """Search memory entries."""
     try:
         memory = _get_memory()
@@ -73,7 +83,11 @@ async def search_memory(request: MemorySearchRequest) -> Dict[str, Any]:
 
 
 @router.get("/events")
-async def get_events(limit: int = 50, event_type: Optional[str] = None) -> List[Dict[str, Any]]:
+async def get_events(
+    limit: int = 50,
+    event_type: Optional[str] = None,
+    _token: str = Depends(optional_node_auth),
+) -> List[Dict[str, Any]]:
     """Get recent events."""
     try:
         memory = _get_memory()
@@ -85,7 +99,10 @@ async def get_events(limit: int = 50, event_type: Optional[str] = None) -> List[
 
 
 @router.delete("/delete/{key}")
-async def delete_memory(key: str) -> Dict[str, Any]:
+async def delete_memory(
+    key: str,
+    _token: str = Depends(optional_node_auth),
+) -> Dict[str, Any]:
     """Delete a memory entry."""
     try:
         memory = _get_memory()
