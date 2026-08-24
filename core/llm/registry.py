@@ -21,6 +21,7 @@ class ProviderEntry:
     capabilities: List[str] = field(default_factory=lambda: ["text_generation"])
     health_check: Optional[HealthCheckFn] = None
     cost_weight: float = 0.0
+    local: bool = True
 
     # Health state (managed internally)
     _healthy: bool = True
@@ -51,6 +52,7 @@ class ProviderRegistry:
         capabilities: Optional[List[str]] = None,
         health_check: Optional[HealthCheckFn] = None,
         cost_weight: float = 0.0,
+        local: bool = True,
     ) -> None:
         self._providers[name] = ProviderEntry(
             name=name,
@@ -59,8 +61,9 @@ class ProviderRegistry:
             capabilities=capabilities or ["text_generation"],
             health_check=health_check or provider.health_check,
             cost_weight=cost_weight,
+            local=local,
         )
-        logger.info("Registered provider: %s (priority=%.1f)", name, priority)
+        logger.info("Registered provider: %s (priority=%.1f, local=%s)", name, priority, local)
 
     def unregister(self, name: str) -> bool:
         if name in self._providers:

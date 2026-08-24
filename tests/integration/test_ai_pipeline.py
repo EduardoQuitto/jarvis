@@ -268,7 +268,6 @@ class TestOrchestratorE2E:
         request = OrchestratorRequest(
             message="Open notepad",
             device_id="test-device",
-            confirmed=False,
         )
         response = await orchestrator.process_message(request)
 
@@ -310,7 +309,6 @@ class TestOrchestratorE2E:
         request = OrchestratorRequest(
             message="Open notepad",
             device_id="test-device",
-            confirmed=False,
         )
         response = await orchestrator.process_message(request)
         assert response.needs_confirmation is True
@@ -322,8 +320,8 @@ class TestOrchestratorE2E:
             message="Yes, open it",
             session_id=session_id,
             device_id="test-device",
-            confirmed=True,
             confirmation_id=cid,
+            approved=True,
         )
         confirm_response = await orchestrator.process_message(confirm_request)
         assert confirm_response.session_id == session_id
@@ -429,16 +427,27 @@ class TestOrchestratorE2E:
         request = OrchestratorRequest(
             message="Organize my Downloads folder",
             device_id="test-device",
-            confirmed=True,
         )
         response = await orchestrator.process_message(request)
 
-        assert len(response.tool_calls_made) >= 1
-        tc = response.tool_calls_made[0]
-        assert tc.tool_name == "create_task"
-        assert tc.success is True
-        assert tc.data["task_id"].startswith("task-")
-        assert tc.data["objective"] == "Organize the Downloads folder"
+        # create_task is YELLOW — needs confirmation
+        assert response.needs_confirmation is True
+        assert response.confirmation_id is not None
+
+        # User confirms
+        cid = response.confirmation_id
+        session_id = response.session_id
+        confirm = OrchestratorRequest(
+            message="Yes, do it",
+            session_id=session_id,
+            device_id="test-device",
+            confirmation_id=cid,
+            approved=True,
+        )
+        confirm_response = await orchestrator.process_message(confirm)
+        assert confirm_response.session_id == session_id
+        # After confirmation the tool is executed and LLM summarizes
+        assert len(confirm_response.tool_calls_made) >= 1
 
 
 # ============================================================

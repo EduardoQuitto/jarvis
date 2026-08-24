@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
 from core.contracts.llm import LLMMessage, LLMToolDef
+from core.contracts.enums import ToolVisibility
 from core.llm.converters import tools_metadata_to_llm_defs
 from core.logger import get_logger
 
@@ -51,6 +52,16 @@ class ContextBuilder:
 
         return messages
 
-    def build_tools_list(self, tool_metadata_list) -> List[LLMToolDef]:
-        """Convert registry tool metadata to LLM tool definitions."""
+    def build_tools_list(self, tool_metadata_list, shared_only: bool = False) -> List[LLMToolDef]:
+        """Convert registry tool metadata to LLM tool definitions.
+
+        Args:
+            shared_only: If True, only include tools with visibility=SHARED.
+                        Used when the next provider is external/untrusted.
+        """
+        if shared_only:
+            tool_metadata_list = [
+                t for t in tool_metadata_list
+                if t.visibility == ToolVisibility.SHARED
+            ]
         return tools_metadata_to_llm_defs(tool_metadata_list)

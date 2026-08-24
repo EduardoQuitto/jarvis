@@ -102,11 +102,47 @@ class MCPServer:
                 "isError": True,
             }
 
-        # Execute the tool
+        # Policy check — MCP never bypasses confirmation
+        from security.policy_engine import PolicyEngine
+        policy = PolicyEngine()
+        decision = policy.evaluate(tool.metadata, arguments, confirmed=False)
+
+        if not decision.allowed and decision.requires_confirmation:
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": json.dumps({
+                            "error": f"requires_confirmation",
+                            "tool": tool_name,
+                            "security_level": tool.metadata.security_level.value,
+                            "reason": decision.reason,
+                        }),
+                    }
+                ],
+                "isError": True,
+            }
+
+        if not decision.allowed:
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": json.dumps({
+                            "error": f"denied",
+                            "tool": tool_name,
+                            "reason": decision.reason,
+                        }),
+                    }
+                ],
+                "isError": True,
+            }
+
+        # Execute the tool (GREEN or operator-approved)
         result = await registry.execute_tool(
             name=tool_name,
             parameters=arguments,
-            confirmed=True,  # MCP calls are pre-authorized
+            confirmed=False,
         )
 
         return {

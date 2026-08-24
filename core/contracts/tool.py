@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional, Type
 from pydantic import BaseModel, Field
 
-from core.contracts.enums import SecurityLevel
+from core.contracts.enums import SecurityLevel, ToolVisibility
 
 
 class ToolResult(BaseModel):
@@ -43,6 +43,7 @@ class ToolMetadata(BaseModel):
     name: str = Field(..., description="Unique snake_case identifier of the tool")
     description: str = Field(..., description="Clear human-readable description of what the tool does")
     security_level: SecurityLevel = Field(default=SecurityLevel.GREEN, description="Security level classification")
+    visibility: ToolVisibility = Field(default=ToolVisibility.LOCAL_ONLY, description="Provider visibility: LOCAL_ONLY or SHARED")
     parameters_schema: Dict[str, Any] = Field(default_factory=dict, description="JSON Schema of acceptable parameters")
     timeout_seconds: float = Field(default=30.0, description="Maximum execution timeout in seconds")
 
@@ -53,6 +54,7 @@ class BaseTool(ABC):
     name: str
     description: str
     security_level: SecurityLevel = SecurityLevel.GREEN
+    visibility: ToolVisibility = ToolVisibility.LOCAL_ONLY
     args_schema: Optional[Type[BaseModel]] = None
     timeout_seconds: float = 30.0
 
@@ -64,6 +66,7 @@ class BaseTool(ABC):
             name=self.name,
             description=self.description,
             security_level=self.security_level,
+            visibility=self.visibility,
             parameters_schema=schema,
             timeout_seconds=self.timeout_seconds,
         )

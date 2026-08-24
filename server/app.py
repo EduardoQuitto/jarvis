@@ -24,7 +24,20 @@ async def lifespan(app: FastAPI):
     registry = get_tool_registry()
     register_default_tools(registry)
     yield
-    # Shutdown logic if needed
+    # Shutdown: close any lingering aiosqlite connections
+    import gc
+    import core.orchestrator.confirmation as _cm
+    import core.events.bus as _eb
+    import core.llm.registry as _pr
+    import tools.registry as _tr
+    if _cm._confirmation_manager is not None:
+        _cm._confirmation_manager = None
+    if _eb._event_bus is not None:
+        _eb._event_bus = None
+    if _pr._provider_registry is not None:
+        _pr._provider_registry = None
+    _tr._registry = None
+    gc.collect()
 
 
 def create_app() -> FastAPI:

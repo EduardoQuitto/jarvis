@@ -85,6 +85,7 @@ def create_router():
                 priority=5.0,
                 capabilities=["text_generation"],
                 cost_weight=0.5,
+                local=False,
             )
             logger.info("External provider configured: %s", settings.external_llm_provider or "external")
 

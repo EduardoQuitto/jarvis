@@ -25,8 +25,8 @@ class OrchestratorRequest(BaseModel):
     session_id: Optional[str] = Field(default=None, description="Conversation session ID (creates new if None)")
     device_id: str = Field(default="unknown", description="Device that sent the message")
     device_capabilities: List[str] = Field(default_factory=list, description="Capabilities of the originating device")
-    confirmed: bool = Field(default=False, description="Whether this is a confirmation for a pending action")
-    confirmation_id: Optional[str] = Field(default=None, description="ID of the action being confirmed")
+    confirmation_id: Optional[str] = Field(default=None, description="ID of the action being confirmed/denied")
+    approved: Optional[bool] = Field(default=None, description="Whether the confirmation was approved (None = pending)")
 
 
 class OrchestratorToolCall(BaseModel):

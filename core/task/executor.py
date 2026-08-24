@@ -55,7 +55,6 @@ class StepExecutor:
                 message=task.objective,
                 session_id=task.conversation_id,
                 device_id=task.device_id or "system",
-                confirmed=True,
             )
 
             result = await self._get_orchestrator().process_message(request)
@@ -92,7 +91,6 @@ class StepExecutor:
         result = await self._tool_executor.execute_tool_call(
             tool_name=tool_name,
             arguments=arguments,
-            confirmed=True,
         )
 
         await self._event_bus.publish(SystemEvent(

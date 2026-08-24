@@ -4,7 +4,7 @@ import time
 from typing import Any, Callable, Dict, Optional, Type
 from pydantic import BaseModel, ValidationError
 
-from core.contracts.enums import SecurityLevel
+from core.contracts.enums import SecurityLevel, ToolVisibility
 from core.contracts.tool import BaseTool, ToolMetadata, ToolResult
 
 
@@ -17,6 +17,7 @@ class FunctionalTool(BaseTool):
         description: str,
         func: Callable[..., Any],
         security_level: SecurityLevel = SecurityLevel.GREEN,
+        visibility: ToolVisibility = ToolVisibility.LOCAL_ONLY,
         args_schema: Optional[Type[BaseModel]] = None,
         timeout_seconds: float = 30.0,
     ):
@@ -24,6 +25,7 @@ class FunctionalTool(BaseTool):
         self.description = description
         self.func = func
         self.security_level = security_level
+        self.visibility = visibility
         self.args_schema = args_schema
         self.timeout_seconds = timeout_seconds
 

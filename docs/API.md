@@ -48,7 +48,7 @@ Retorna a saúde geral do nó, quantidade de ferramentas registradas e resumo de
 Retorna métricas detalhadas em tempo real de CPU, RAM, discos e processos.
 
 ### 3. `GET /tools`
-Lista todas as ferramentas registradas no nó com seus respectivos esquemas JSON Schema e níveis de segurança.
+Lista todas as ferramentas registradas no nó com seus respectivos esquemas JSON Schema, níveis de segurança e visibilidade.
 
 ### 4. `POST /tools/execute`
 Executa uma ferramenta registrada após validação de políticas no `PolicyEngine`.
@@ -59,9 +59,11 @@ Executa uma ferramenta registrada após validação de políticas no `PolicyEngi
   "parameters": {
     "app_name": "notepad"
   },
-  "confirmed": true
+  "operator_direct": true
 }
 ```
+* **Nota:** `operator_direct` substitui o antigo campo `confirmed`. Apenas o operador via REST pode definir `operator_direct=true`. LLM, MCP e StepExecutor nunca definem esse campo.
+
 * **Resposta (200 OK):**
 ```json
 {
@@ -76,4 +78,78 @@ Executa uma ferramenta registrada após validação de políticas no `PolicyEngi
   "execution_time_ms": 15.2,
   "security_level": "YELLOW"
 }
+```
+
+---
+
+## Chat API
+
+### 5. `POST /chat`
+Endpoint principal de interação com o assistente.
+* **Corpo da Requisição:**
+```json
+{
+  "message": "launch notepad",
+  "session_id": "sess-abc123"
+}
+```
+* **Resposta — GREEN tool (200 OK):**
+```json
+{
+  "status": "ok",
+  "response": "Notepad has been launched.",
+  "session_id": "sess-abc123",
+  "tool_used": "launch_application",
+  "execution_time_ms": 150
+}
+```
+* **Resposta — YELLOW tool (200 OK):**
+```json
+{
+  "status": "needs_confirmation",
+  "confirmation_id": "confirm-xxx",
+  "tool_name": "launch_application",
+  "arguments": {"app_name": "notepad"},
+  "security_level": "YELLOW",
+  "reason": "Tool 'launch_application' is classified YELLOW"
+}
+```
+* **Resposta — YELLOW tool aprovado (200 OK):**
+```json
+{
+  "status": "ok",
+  "response": "Notepad has been launched successfully.",
+  "session_id": "sess-abc123"
+}
+```
+
+### Fluxo de Confirmação
+1. Usuário envia mensagem que requer tool YELLOW/RED.
+2. Orchestrator retorna `needs_confirmation` + `confirmation_id`.
+3. Usuário aprova: `POST /chat` com mesma `message` + `approved=true` + `session_id`.
+4. Orchestrator confirma → consome cid (single-use) → executa tool → LLM gera resumo.
+
+---
+
+## MCP Server (JSON-RPC 2.0)
+
+### 6. `POST /mcp`
+Endpoint MCP para clientes externos.
+* **Métodos suportados:** `initialize`, `tools/list`, `tools/call`, `ping`.
+* **Política de segurança:**
+  - GREEN tools: executam normalmente.
+  - YELLOW/RED tools: retornam erro `requires_confirmation` ao cliente MCP.
+  - MCP nunca bypassa confirmação.
+
+---
+
+## Configuração
+
+Variáveis de ambiente relevantes (via `.env` ou `core/config.py`):
+```env
+JARVIS_API_KEY=your-secret-key
+JARVIS_EXTERNAL_LLM_API_KEY=gsk_...
+JARVIS_EXTERNAL_LLM_BASE_URL=https://api.groq.com/openai/v1
+JARVIS_EXTERNAL_LLM_MODEL=llama-3.3-70b-versatile
+JARVIS_NET_ALLOW_PRIVATE_NETWORKS=["192.168.1.0/24"]  # opt-in LAN access
 ```

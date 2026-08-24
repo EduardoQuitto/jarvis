@@ -5,6 +5,39 @@ All notable changes to the J.A.R.V.I.S. project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-08-24
+
+### Added
+- **Security Hardening Pass (P0 + A1 + A2):**
+  - `ConfirmationManager` rewrite: `session_id`/`call_id` binding, `consume(cid, session_id)` single-use, `list_pending()`, `wait_for_confirmation()` preserved.
+  - Orchestrator: `confirmed` removed → `approved` param; approve→consume→execute→LLM summary flow; never sets `confirmed=True` internally.
+  - MCP: YELLOW/RED return `requires_confirmation` error; GREEN execute normally; `confirmed=False` enforced.
+  - StepExecutor and ToolExecutor: `confirmed=True` removed; `operator_direct` replaces `confirmed` param.
+  - Chat API: `confirmed` field removed → `approved` field added.
+  - `ToolVisibility` enum: `LOCAL_ONLY` (default), `SHARED`.
+  - Tools marked SHARED: `echo`, `get_current_time`, `web_search`, `fetch_url`.
+  - `ProviderRegistry`: `local: bool` field on `ProviderEntry`; external provider registered `local=False`.
+  - `IntelligenceRouter.is_next_provider_local()`: checks top candidate's locality.
+  - `ContextBuilder.build_tools_list(shared_only)`: filters tools by visibility for external providers.
+  - `security/net_guard.py`: SSRF protection — URL validation, DNS resolution, private IP blocking, redirect hop-by-hop validation, opt-in CIDR via `JARVIS_NET_ALLOW_PRIVATE_NETWORKS`.
+  - `FetchUrlTool`: uses net_guard, `follow_redirects=False` with manual redirect loop.
+  - `FileTool`: uses `AllowlistValidator.validate_file_path()` with symlink resolution and `relative_to()` containment.
+  - Config: `net_allow_private_networks: List[str]` for opt-in LAN access.
+- **Test Infrastructure:**
+  - `tests/conftest.py`: autouse fixture isolates DB via `tmp_path`, resets all singletons, forces `gc.collect()`.
+  - `server/app.py`: lifespan shutdown resets singletons + gc.collect(); hang-at-exit fixed.
+- **Testing:**
+  - 43 new unit and integration tests (153 total, 0 failures, 0 warnings).
+
+### Changed
+- `core/contracts/orchestrator.py`: `OrchestratorRequest.confirmed` removed → `approved: Optional[bool]`.
+- `core/orchestrator/tool_executor.py`: `confirmed` param replaced by `operator_direct: bool`.
+- `core/contracts/enums.py`: `ToolVisibility` enum added.
+- `core/contracts/tool.py`: `visibility` field added to `ToolMetadata` and `BaseTool`.
+- `tools/base.py`: `FunctionalTool` accepts `visibility` param.
+
+---
+
 ## [0.2.0] - 2026-08-20
 
 ### Added

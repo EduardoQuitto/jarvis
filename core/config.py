@@ -57,6 +57,12 @@ class Settings(BaseSettings):
     external_llm_model: str = Field(default="", description="Model name for external LLM provider")
     external_llm_provider: str = Field(default="", description="Descriptive name for external provider")
 
+    # Network Security — SSRF Protection
+    net_allow_private_networks: List[str] = Field(
+        default_factory=list,
+        description="CIDR ranges allowed for fetch_url (SSRF guard). Default: all private/blocked.",
+    )
+
     # Logging
     log_level: str = Field(default="INFO", description="Logging level")
 

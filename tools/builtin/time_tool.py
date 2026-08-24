@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from typing import Any, Optional, Type
 from pydantic import BaseModel, Field
 
-from core.contracts.enums import SecurityLevel
+from core.contracts.enums import SecurityLevel, ToolVisibility
 from core.contracts.tool import BaseTool, ToolResult
 
 
@@ -18,6 +18,7 @@ class GetCurrentTimeTool(BaseTool):
     name: str = "get_current_time"
     description: str = "Get the current date, time, and timezone information."
     security_level: SecurityLevel = SecurityLevel.GREEN
+    visibility: ToolVisibility = ToolVisibility.SHARED
     args_schema: Optional[Type[BaseModel]] = TimeArgs
 
     async def execute(self, **kwargs: Any) -> ToolResult:

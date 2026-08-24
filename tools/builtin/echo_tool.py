@@ -3,7 +3,7 @@
 from typing import Any, Optional, Type
 from pydantic import BaseModel, Field
 
-from core.contracts.enums import SecurityLevel
+from core.contracts.enums import SecurityLevel, ToolVisibility
 from core.contracts.tool import BaseTool, ToolResult
 
 
@@ -17,6 +17,7 @@ class EchoTool(BaseTool):
     name: str = "echo"
     description: str = "Echo back the input message for diagnostics and connectivity checks."
     security_level: SecurityLevel = SecurityLevel.GREEN
+    visibility: ToolVisibility = ToolVisibility.SHARED
     args_schema: Optional[Type[BaseModel]] = EchoArgs
 
     async def execute(self, **kwargs: Any) -> ToolResult:

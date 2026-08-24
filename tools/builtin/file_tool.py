@@ -1,13 +1,12 @@
 """File operations tool for reading/writing files on the server."""
 
-import os
 from pathlib import Path
 from typing import Any, Optional, Type
 from pydantic import BaseModel, Field
 
 from core.contracts.enums import SecurityLevel
 from core.contracts.tool import BaseTool, ToolResult
-from core.config import get_settings
+from security.allowlist import AllowlistValidator, SecurityValidationError
 
 
 class ReadFileArgs(BaseModel):
@@ -33,14 +32,13 @@ class ReadFileTool(BaseTool):
 
     async def execute(self, **kwargs: Any) -> ToolResult:
         file_path = kwargs.get("file_path", "")
-        settings = get_settings()
+        validator = AllowlistValidator()
 
-        # Security: restrict to allowed directories
-        resolved = Path(file_path).resolve()
-        allowed_dirs = [Path(d).resolve() for d in settings.allowed_paths]
-        if not any(str(resolved).startswith(str(d)) for d in allowed_dirs):
+        try:
+            resolved = validator.validate_file_path(file_path, must_exist=False)
+        except SecurityValidationError as e:
             return ToolResult.fail(
-                error=f"Access denied: {file_path} is outside allowed directories",
+                error=f"Access denied: {e}",
                 security_level=self.security_level,
             )
 
@@ -67,13 +65,13 @@ class WriteFileTool(BaseTool):
     async def execute(self, **kwargs: Any) -> ToolResult:
         file_path = kwargs.get("file_path", "")
         content = kwargs.get("content", "")
-        settings = get_settings()
+        validator = AllowlistValidator()
 
-        resolved = Path(file_path).resolve()
-        allowed_dirs = [Path(d).resolve() for d in settings.allowed_paths]
-        if not any(str(resolved).startswith(str(d)) for d in allowed_dirs):
+        try:
+            resolved = validator.validate_file_path(file_path, must_exist=False)
+        except SecurityValidationError as e:
             return ToolResult.fail(
-                error=f"Access denied: {file_path} is outside allowed directories",
+                error=f"Access denied: {e}",
                 security_level=self.security_level,
             )
 
@@ -98,13 +96,13 @@ class ListDirTool(BaseTool):
 
     async def execute(self, **kwargs: Any) -> ToolResult:
         directory = kwargs.get("directory", ".")
-        settings = get_settings()
+        validator = AllowlistValidator()
 
-        resolved = Path(directory).resolve()
-        allowed_dirs = [Path(d).resolve() for d in settings.allowed_paths]
-        if not any(str(resolved).startswith(str(d)) for d in allowed_dirs):
+        try:
+            resolved = validator.validate_file_path(directory, must_exist=False)
+        except SecurityValidationError as e:
             return ToolResult.fail(
-                error=f"Access denied: {directory} is outside allowed directories",
+                error=f"Access denied: {e}",
                 security_level=self.security_level,
             )
 

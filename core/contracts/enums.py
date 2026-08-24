@@ -27,3 +27,13 @@ class TaskStatus(str, Enum):
     FAILED = "FAILED"
     REQUIRE_APPROVAL = "REQUIRE_APPROVAL"
     CANCELLED = "CANCELLED"
+
+
+class ToolVisibility(str, Enum):
+    """Controls which LLM providers can see a tool's schema.
+
+    LOCAL_ONLY — only providers flagged as local (Ollama, Mock) receive this tool.
+    SHARED     — visible to all providers, including external/cloud.
+    """
+    LOCAL_ONLY = "LOCAL_ONLY"
+    SHARED = "SHARED"

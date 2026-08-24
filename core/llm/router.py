@@ -232,6 +232,7 @@ class IntelligenceRouter:
                 "priority": entry.priority,
                 "circuit_open": self._circuit_breaker.is_open(entry.name),
                 "capabilities": entry.capabilities,
+                "local": entry.local,
                 "model": entry.provider.get_model_info().get("model", ""),
             })
         return {
@@ -239,3 +240,15 @@ class IntelligenceRouter:
             "healthy_count": self._registry.healthy_count,
             "total_count": self._registry.provider_count,
         }
+
+    async def is_next_provider_local(self, task_type: Optional[str] = None) -> bool:
+        """Check if the next provider in the routing chain is local.
+
+        Used to decide tool visibility before calling the LLM.
+        Returns True if no candidates exist (safe default).
+        """
+        all_candidates = await self._registry.get_candidates(task_type=task_type)
+        candidates = self._filter_candidates(all_candidates, task_type)
+        if not candidates:
+            return True
+        return candidates[0].local

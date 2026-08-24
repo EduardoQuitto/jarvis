@@ -45,6 +45,24 @@
 - [x] Eventos `PROVIDER_SELECTED`, `PROVIDER_FAILED`, `ROUTING_STARTED` no EventBus.
 - [x] 41 novos testes (total: 110 testes, 0 falhas, 0 warnings).
 
+### ✅ Fase 8: Security Hardening (Concluída)
+- [x] Confirmação corrigida: `confirmed` removido do Orchestrator/Chat API → `approved`.
+- [x] ConfirmationManager: `session_id`/`call_id` vinculados, `consume()` single-use.
+- [x] MCP: YELLOW/RED retornam `requires_confirmation` ao cliente; GREEN executam.
+- [x] StepExecutor e ToolExecutor: `confirmed=True` removido.
+- [x] `ToolVisibility` enum: `LOCAL_ONLY` (padrão), `SHARED`.
+- [x] Tools SHARED: `echo`, `get_current_time`, `web_search`, `fetch_url`.
+- [x] ProviderRegistry: campo `local: bool` em `ProviderEntry`.
+- [x] IntelligenceRouter: `is_next_provider_local()` para filtro de visibilidade.
+- [x] ContextBuilder: `build_tools_list(shared_only)` filtra por visibility.
+- [x] Orchestrator: usa router para filtrar tools antes de chamar LLM externo.
+- [x] `security/net_guard.py`: anti-SSRF com validação de URL, DNS, redirect hop-by-hop.
+- [x] FetchUrlTool: usa net_guard, `follow_redirects=False` com redirect manual.
+- [x] FileTool: usa `AllowlistValidator.validate_file_path()` com symlink resolution.
+- [x] Config: `net_allow_private_networks` para opt-in de LAN.
+- [x] Test infrastructure: DB isolamento via `tmp_path`, singleton resets, gc.collect().
+- [x] 43 novos testes (total: 153 testes, 0 falhas, 0 warnings).
+
 ---
 
 ### ⏳ Próximas Fases (Futuras)

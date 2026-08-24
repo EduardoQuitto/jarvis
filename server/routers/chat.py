@@ -33,8 +33,8 @@ class ChatRequest(BaseModel):
     message: str = Field(..., description="User message")
     session_id: Optional[str] = Field(default=None, description="Existing conversation session ID")
     device_id: str = Field(default="api", description="Device ID")
-    confirmed: bool = Field(default=False, description="Confirmation for pending actions")
-    confirmation_id: Optional[str] = Field(default=None, description="Confirmation ID if confirming")
+    confirmation_id: Optional[str] = Field(default=None, description="Confirmation ID if responding to a pending confirmation")
+    approved: Optional[bool] = Field(default=None, description="Whether the confirmation is approved (None = not a confirmation response)")
 
 
 class ChatResponse(BaseModel):
@@ -59,8 +59,8 @@ async def send_message(
             message=request.message,
             session_id=request.session_id,
             device_id=request.device_id,
-            confirmed=request.confirmed,
             confirmation_id=request.confirmation_id,
+            approved=request.approved,
         )
 
         result = await orchestrator.process_message(orch_request)

@@ -16,7 +16,10 @@ logger = get_logger("jarvis.tool_executor")
 class ToolExecutor:
     """Executes tool calls from the LLM through the existing ToolRegistry and PolicyEngine.
 
-    Flow: LLM tool call → validate tool exists → PolicyEngine check → ToolRegistry.execute → ToolResult
+    Flow: LLM tool call -> validate tool exists -> PolicyEngine check -> ToolRegistry.execute -> ToolResult
+
+    Security note: this executor never sets confirmed=True internally.
+    Confirmed actions are always routed through the ConfirmationManager.
     """
 
     def __init__(
@@ -43,9 +46,14 @@ class ToolExecutor:
         tool_name: str,
         arguments: Dict[str, Any],
         call_id: Optional[str] = None,
-        confirmed: bool = False,
+        operator_direct: bool = False,
     ) -> OrchestratorToolResult:
         """Execute a single tool call from the LLM.
+
+        Args:
+            operator_direct: True only when called from authenticated REST endpoint
+            (require_node_auth) — the operator is directly authorizing the action.
+            LLM/MCP/StepExecutor paths always pass False.
 
         Returns an OrchestratorToolResult with the outcome.
         """
@@ -67,7 +75,7 @@ class ToolExecutor:
             )
 
         # 2. Policy check
-        decision = policy.evaluate(tool.metadata, arguments, confirmed=confirmed)
+        decision = policy.evaluate(tool.metadata, arguments, confirmed=operator_direct)
         if not decision.allowed:
             logger.info("Policy denied tool '%s': %s", tool_name, decision.reason)
             return OrchestratorToolResult(
@@ -78,11 +86,11 @@ class ToolExecutor:
             )
 
         # 3. Execute
-        logger.info("Executing tool '%s' (confirmed=%s)", tool_name, confirmed)
+        logger.info("Executing tool '%s' (operator_direct=%s)", tool_name, operator_direct)
         result: ToolResult = await registry.execute_tool(
             name=tool_name,
             parameters=arguments,
-            confirmed=confirmed,
+            confirmed=operator_direct,
         )
 
         return OrchestratorToolResult(

@@ -4,7 +4,7 @@ import json
 from typing import Any, Optional, Type
 from pydantic import BaseModel, Field
 
-from core.contracts.enums import SecurityLevel
+from core.contracts.enums import SecurityLevel, ToolVisibility
 from core.contracts.tool import BaseTool, ToolResult
 
 
@@ -24,6 +24,7 @@ class WebSearchTool(BaseTool):
     name: str = "web_search"
     description: str = "Search the web for current information on any topic."
     security_level: SecurityLevel = SecurityLevel.GREEN
+    visibility: ToolVisibility = ToolVisibility.SHARED
     args_schema: Optional[Type[BaseModel]] = WebSearchArgs
 
     async def execute(self, **kwargs: Any) -> ToolResult:
@@ -82,25 +83,71 @@ class WebSearchTool(BaseTool):
 
 
 class FetchUrlTool(BaseTool):
-    """Fetch content from a URL."""
+    """Fetch content from a URL with SSRF protection."""
 
     name: str = "fetch_url"
     description: str = "Fetch the content of a web page or API endpoint."
     security_level: SecurityLevel = SecurityLevel.GREEN
+    visibility: ToolVisibility = ToolVisibility.SHARED
     args_schema: Optional[Type[BaseModel]] = FetchUrlArgs
+
+    MAX_REDIRECTS = 5
+    MAX_RESPONSE_BYTES = 512_000  # 512KB
 
     async def execute(self, **kwargs: Any) -> ToolResult:
         url = kwargs.get("url", "")
         timeout = kwargs.get("timeout", 30)
 
         try:
+            from security.net_guard import validate_url, validate_redirect_url, SSRFBlocked
+        except ImportError:
+            return ToolResult.fail(
+                error="net_guard module not available",
+                security_level=self.security_level,
+            )
+
+        try:
+            validate_url(url)
+        except (SSRFBlocked, ValueError) as e:
+            return ToolResult.fail(
+                error=f"URL blocked by security policy: {e}",
+                security_level=self.security_level,
+            )
+
+        try:
             import httpx
 
-            async with httpx.AsyncClient(timeout=float(timeout), follow_redirects=True) as client:
-                response = await client.get(
-                    url,
-                    headers={"User-Agent": "JARVIS/0.1"},
-                )
+            async with httpx.AsyncClient(
+                timeout=float(timeout),
+                follow_redirects=False,
+            ) as client:
+                current_url = url
+                for hop in range(self.MAX_REDIRECTS + 1):
+                    response = await client.get(
+                        current_url,
+                        headers={"User-Agent": "JARVIS/0.1"},
+                    )
+
+                    if response.status_code in (301, 302, 303, 307, 308):
+                        location = response.headers.get("location", "")
+                        if not location:
+                            break
+                        # Resolve relative redirects
+                        if location.startswith("/"):
+                            from urllib.parse import urlparse as _urlparse
+                            base = _urlparse(current_url)
+                            location = f"{base.scheme}://{base.netloc}{location}"
+                        try:
+                            validate_redirect_url(location, current_url)
+                        except (SSRFBlocked, ValueError) as e:
+                            return ToolResult.fail(
+                                error=f"Redirect blocked by security policy: {e}",
+                                security_level=self.security_level,
+                            )
+                        current_url = location
+                        continue
+
+                    break
 
                 content_type = response.headers.get("content-type", "")
 
@@ -115,7 +162,7 @@ class FetchUrlTool(BaseTool):
                         pass
 
                 # Return text content (truncated for safety)
-                text = response.text[:50000]  # Limit to 50KB
+                text = response.text[:50000]
                 return ToolResult.ok(
                     data={"content": text, "format": "text", "status": response.status_code},
                     security_level=self.security_level,
