@@ -93,3 +93,82 @@ result = await registry.execute_tool(
     parameters={"message": "Hello"},
 )
 ```
+
+---
+
+## 5. Agent System
+
+### AgentFactory
+Cria agentes especializados com permissões controladas:
+
+```python
+from core.agent.factory import get_agent_factory
+
+factory = get_agent_factory()
+
+# Research agent — apenas tools SHARED
+agent = factory.create_research_agent(
+    name="Pesquisador",
+    objective="Pesquisar frameworks de teste",
+)
+
+# Developer agent — acesso a files
+agent = factory.create_developer_agent(
+    name="Desenvolvedor",
+    objective="Escrever código",
+)
+
+# Analyst agent — métricas do sistema
+agent = factory.create_analyst_agent(
+    name="Analista",
+    objective="Analisar performance",
+)
+
+# Critic agent — revisão
+agent = factory.create_critic_agent(
+    name="Crítico",
+    objective="Revisar código",
+)
+
+# Custom agent
+agent = factory.create_agent(
+    agent_type="custom",
+    name="Meu Agente",
+    objective="Tarefa específica",
+    tool_allowlist=["echo", "web_search"],
+    max_iterations=5,
+)
+```
+
+### Tipos de Agent
+| Tipo | Tools | max_iterations | LOCAL_ONLY |
+|------|-------|----------------|------------|
+| research | echo, get_current_time, web_search, fetch_url | 10 | Não |
+| developer | echo, get_current_time, web_search, fetch_url, read_file, write_file, list_dir | 15 | Sim |
+| analyst | echo, get_current_time, get_system_metrics, list_processes | 10 | Sim |
+| critic | echo, get_current_time | 5 | Não |
+| custom | Especificado pelo usuário | 10 | Não |
+
+### GoalEngine
+Gerencia objetivos de alto nível:
+
+```python
+from core.goal.engine import get_goal_engine
+
+engine = get_goal_engine()
+
+# Criar goal
+goal = await engine.create_goal(
+    objective="Pesquisar e comparar frameworks",
+    success_criteria=["Encontrar top 3", "Comparar features"],
+)
+
+# Iniciar com plano
+await engine.start_goal(goal.goal_id, plan_id="plan-123")
+
+# Completar
+await engine.complete_goal(goal.goal_id, result="Pesquisa concluída")
+
+# Replanejar quando step falha
+decision = await engine.request_replan(goal.goal_id, "step-2", "Tool failed")
+```

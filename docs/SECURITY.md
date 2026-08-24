@@ -122,6 +122,34 @@ Tools locais (read_file, launch_application, list_dir) expõem informação sens
 ### Execução
 ```bash
 python -m pytest -q --no-header -p no:cacheprovider
-# Resultado: 153 passed, 0 failed, exit 0
+# Resultado: 190 passed, 0 failed, exit 0
 # data/jarvis.db inalterado (D8A125F20EB72BEBE45D0378CECED2A2)
 ```
+
+---
+
+## 8. Agent Security Model
+
+### Restrições de Agentes
+Agentes criados pelo AgentFactory possuem permissões imutáveis definidas na criação:
+
+* **Tool Allowlist**: apenas tools explicitamente listadas podem ser usadas. Lista vazia = nenhuma tool permitida.
+* **Provider Allowlist**: apenas provedores explicitamente listados podem ser usados. Lista vazia = qualquer provedor.
+* **can_confirm_actions**: agentes NÃO podem confirmar ações YELLOW/RED por padrão. Apenas o sistema pode conceder essa permissão.
+* **can_access_local_only_tools**: agentes com provider externo não veem tools LOCAL_ONLY (proteção de dados sensíveis).
+* **max_iterations** e **max_duration_seconds**: limites de execução para prevenir loops infinitos.
+
+### O que um Agent NUNCA pode fazer
+* Conceder permissões a si mesmo
+* Bypasse o PolicyEngine
+* Usar `confirmed=True` em tool calls
+* Acessar tools fora de sua allowlist
+* Modificar níveis de segurança
+* Modificar políticas do sistema
+
+### Validação
+`AgentSecurityValidator` verifica:
+1. Nomes de tools são identificadores válidos
+2. Permissões restritas não são concedidas indevidamente
+3. Execução de tools respeita allowlist e visibilidade
+4. `confirmed=True` nunca é passado por agentes

@@ -46,3 +46,6 @@ data/
 *.sqlite
 *.db
 logs/
+
+# Deepwork (local session state)
+.slim/deepwork/

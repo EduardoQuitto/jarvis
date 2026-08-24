@@ -5,6 +5,49 @@ All notable changes to the J.A.R.V.I.S. project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-08-24
+
+### Added
+- **Goal Engine:**
+  - `GoalEngine` — manages high-level objectives with lifecycle (create/start/complete/fail/cancel).
+  - `Goal`, `GoalResult`, `GoalStatus` contracts (`core/contracts/goal.py`).
+  - `ReplanDecision` — decides retry/skip/abort/ask_user when steps fail.
+  - Integration with `TaskManager` for persistence and `EventBus` for events.
+- **Agent System:**
+  - `Agent` — specialized executor with identity, permissions, and isolated context.
+  - `AgentSpec`, `AgentState`, `AgentResult`, `AgentPermission` contracts (`core/contracts/agent.py`).
+  - `AgentRegistry` — tracks active and completed agents.
+  - `AgentFactory` — creates agents dynamically with security validation.
+  - `AgentSecurityValidator` — enforces permission constraints and prevents privilege escalation.
+  - Predefined agent types: `ResearchAgent`, `DeveloperAgent`, `AnalystAgent`, `CriticAgent`.
+  - Agents are task-scoped (temporary) and cannot grant themselves permissions.
+- **Planner Evolution:**
+  - `PlanExecutor` now supports `ReplanCallback` for step failure handling.
+  - Replan actions: `RETRY_SAME`, `SKIP_STEP`, `ALTERNATIVE_STEP`, `ABORT`, `ASK_USER`.
+  - Step-level retry with `max_retries`.
+- **Orchestrator Goal Integration:**
+  - `GoalOrchestrator` — routes complex requests to GoalEngine, simple requests to normal Orchestrator.
+  - Complexity detection via heuristic (action verbs, message length, multi-step indicators).
+- **New Enums:**
+  - `GoalStatus`: pending, planning, running, waiting_confirmation, blocked, failed, replanning, completed, cancelled.
+  - `AgentStatus`: pending, running, waiting_confirmation, completed, failed, cancelled.
+  - `ReplanAction`: retry_same, skip_step, alternative_step, abort, ask_user.
+- **New Events:**
+  - `GOAL_CREATED`, `GOAL_STARTED`, `GOAL_COMPLETED`, `GOAL_FAILED`, `GOAL_CANCELLED`.
+  - `PLAN_CREATED`, `PLAN_STEP_STARTED`, `PLAN_STEP_COMPLETED`, `PLAN_STEP_FAILED`.
+  - `AGENT_CREATED`, `AGENT_STARTED`, `AGENT_COMPLETED`, `AGENT_FAILED`.
+  - `REPLANNING_STARTED`, `REPLANNING_COMPLETED`.
+- **Testing:**
+  - 37 new unit and integration tests (190 total, 0 failures, 0 warnings).
+
+### Changed
+- `core/contracts/planner.py`: `ExecutionPlan` now has `goal_id` and `agent_id` fields.
+- `core/contracts/planner.py`: `TaskStep` now has `retry_count`, `max_retries`, `replan_action`.
+- `core/contracts/planner.py`: `PlanResult` now has `failed_step_id` and `replan_action`.
+- `core/planner/engine.py`: evolved with replanning support and event publishing.
+
+---
+
 ## [0.3.0] - 2026-08-24
 
 ### Added

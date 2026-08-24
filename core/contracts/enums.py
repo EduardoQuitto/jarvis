@@ -37,3 +37,35 @@ class ToolVisibility(str, Enum):
     """
     LOCAL_ONLY = "LOCAL_ONLY"
     SHARED = "SHARED"
+
+
+class GoalStatus(str, Enum):
+    """Lifecycle status for goals in the Goal Engine."""
+    PENDING = "pending"
+    PLANNING = "planning"
+    RUNNING = "running"
+    WAITING_CONFIRMATION = "waiting_confirmation"
+    BLOCKED = "blocked"
+    FAILED = "failed"
+    REPLANNING = "replanning"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
+
+
+class AgentStatus(str, Enum):
+    """Lifecycle status for agents."""
+    PENDING = "pending"
+    RUNNING = "running"
+    WAITING_CONFIRMATION = "waiting_confirmation"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class ReplanAction(str, Enum):
+    """Actions the GoalEngine can take when a step fails."""
+    RETRY_SAME = "retry_same"
+    SKIP_STEP = "skip_step"
+    ALTERNATIVE_STEP = "alternative_step"
+    ABORT = "abort"
+    ASK_USER = "ask_user"

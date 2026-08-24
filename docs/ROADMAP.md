@@ -63,6 +63,20 @@
 - [x] Test infrastructure: DB isolamento via `tmp_path`, singleton resets, gc.collect().
 - [x] 43 novos testes (total: 153 testes, 0 falhas, 0 warnings).
 
+### ✅ Fase 9: Goal Engine + Agent System (Concluída)
+- [x] Goal Engine: `core/goal/engine.py` — lifecycle de goals com replanning.
+- [x] Goal contracts: `core/contracts/goal.py` — Goal, GoalResult, GoalStatus, ReplanDecision.
+- [x] Agent contracts: `core/contracts/agent.py` — AgentSpec, AgentState, AgentResult, AgentPermission.
+- [x] Agent System: `core/agent/agent.py` — executor isolado com permissões imutáveis.
+- [x] Agent Registry: `core/agent/registry.py` — tracking de agentes ativos.
+- [x] Agent Factory: `core/agent/factory.py` — criação dinâmica com validação de segurança.
+- [x] Agent Security: `core/agent/security.py` — validação de permissões e restrições.
+- [x] Planner evoluído: `core/planner/engine.py` — replanning com ReplanCallback.
+- [x] Orchestrator Goal Integration: `core/orchestrator/goal_integration.py` — roteamento inteligente.
+- [x] Novos enums: `GoalStatus`, `AgentStatus`, `ReplanAction` em `core/contracts/enums.py`.
+- [x] Novos eventos: GOAL_*, PLAN_*, AGENT_*, REPLANNING_* no EventBus.
+- [x] 37 novos testes (total: 190 testes, 0 falhas, 0 warnings).
+
 ---
 
 ### ⏳ Próximas Fases (Futuras)
