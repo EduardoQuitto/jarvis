@@ -8,19 +8,19 @@ J.A.R.V.I.S. é um assistente pessoal local, modular e distribuído, construído
 
 ---
 
-## 🏛️ Arquitetura e Topologia
+##  Arquitetura e Topologia
 
 O sistema é planejado para operar em uma rede de nós heterogêneos:
 
-* **JARVIS SERVER (i3-3220 / 4 GB / Ubuntu Server):** Gateway 24/7, Home Assistant, automações, scheduler, Wake-on-LAN.
+* **JARVIS SERVER (i3-3220 / 8 GB / Ubuntu Server):** Gateway 24/7, Home Assistant, automações, scheduler, Wake-on-LAN.
 * **JARVIS CORE (i5-14400 / 32 GB / NVMe):** Raciocínio, IA local, síntese/reconhecimento de voz, visão computacional.
-* **NODE 2 / Windows Agent (Pentium G3260 / 8 GB / GTX 650 Ti):** Ambiente de desenvolvimento e nó auxiliar para tarefas nativas do Windows.
+* **NODE 2 / Windows Agent (i5-7400 / 8 GB / GTX 650 Ti):** Ambiente de desenvolvimento e nó auxiliar para tarefas nativas do Windows.
 * **JARVIS MOBILE (Galaxy S20 FE):** Sensores móveis, notificações, controle Android.
 * **JARVIS PANEL (Galaxy Tab E):** Dashboard de telemetria ultraleve.
 
 ---
 
-## 🚀 Como Executar Localmente
+##  Como Executar Localmente
 
 ### 1. Clonar e Configurar o Ambiente
 
@@ -54,7 +54,7 @@ python -m uvicorn server.app:create_app --factory --host 127.0.0.1 --port 8000 -
 
 ---
 
-## 🛡️ Camada de Segurança
+##  Camada de Segurança
 
 * **Classificação por Cores:**
   * 🟢 **Verde:** Consultas de telemetria e processos (execução imediata).
@@ -65,7 +65,7 @@ python -m uvicorn server.app:create_app --factory --host 127.0.0.1 --port 8000 -
 
 ---
 
-## 📚 Documentação Técnica
+##  Documentação Técnica
 
 Consulte o diretório [`docs/`](docs/) para especificações completas:
 * [`docs/AGENTS.md`](docs/AGENTS.md) — Regras permanentes do projeto
