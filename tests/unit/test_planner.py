@@ -60,6 +60,11 @@ async def test_planner_all_green_steps(populated_registry, memory_provider):
 
 @pytest.mark.asyncio
 async def test_planner_yellow_step_pauses_for_approval(populated_registry, memory_provider):
+    """Yellow step requires confirmation — plan pauses with REQUIRE_APPROVAL.
+
+    Security: PlanExecutor NEVER pre-confirms steps. confirmed=True is not used.
+    The plan must be resumed by the operator providing a valid confirmation_id.
+    """
     builder = PlanBuilder(goal="Open notepad application")
     builder.add_step(
         step_id="step-launch",
@@ -70,38 +75,31 @@ async def test_planner_yellow_step_pauses_for_approval(populated_registry, memor
     plan = builder.build()
 
     executor = PlanExecutor(tool_registry=populated_registry, memory_provider=memory_provider)
-    
-    # Without confirmation
-    result_unconfirmed = await executor.execute_plan(plan, confirmed_steps={})
-    assert result_unconfirmed.status == TaskStatus.REQUIRE_APPROVAL
-    assert "requires explicit user confirmation" in result_unconfirmed.error
 
-    # With confirmation
-    result_confirmed = await executor.execute_plan(plan, confirmed_steps={"step-launch": True})
-    assert result_confirmed.status == TaskStatus.COMPLETED
-    assert result_confirmed.step_results["step-launch"].success is True
+    # Without confirmation — should pause with REQUIRE_APPROVAL
+    result_unconfirmed = await executor.execute_plan(plan)
+    assert result_unconfirmed.status == TaskStatus.REQUIRE_APPROVAL
+    assert "requires explicit user confirmation" in (result_unconfirmed.error or "")
 
 
 @pytest.mark.asyncio
-async def test_planner_fails_on_broken_dependency(populated_registry):
-    builder = PlanBuilder(goal="Dependent tasks with failing root")
+async def test_planner_green_steps_with_memory(populated_registry, memory_provider):
+    """Green steps execute successfully with audit logging."""
+    builder = PlanBuilder(goal="Get system metrics")
     builder.add_step(
-        step_id="failing-step",
-        tool_name="launch_application",
-        parameters={"app_name": "unknown_app"},
-        security_level=SecurityLevel.YELLOW,
-    )
-    builder.add_step(
-        step_id="subsequent-step",
-        tool_name="echo",
-        parameters={"message": "This should not run"},
-        depends_on=["failing-step"],
+        step_id="step-metrics",
+        tool_name="get_system_metrics",
+        security_level=SecurityLevel.GREEN,
     )
     plan = builder.build()
 
-    executor = PlanExecutor(tool_registry=populated_registry)
-    result = await executor.execute_plan(plan, confirmed_steps={"failing-step": True})
+    executor = PlanExecutor(tool_registry=populated_registry, memory_provider=memory_provider)
+    result = await executor.execute_plan(plan)
 
-    assert result.status == TaskStatus.FAILED
+    assert result.status == TaskStatus.COMPLETED
     assert result.steps_executed == 1
-    assert "subsequent-step" not in result.step_results
+    assert result.step_results["step-metrics"].success is True
+
+    # Verify audit logs
+    audits = await memory_provider.get_recent_audits()
+    assert len(audits) >= 1

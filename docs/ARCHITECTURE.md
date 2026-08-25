@@ -115,9 +115,21 @@ graph TD
 
 ## 4. Security Architecture
 
-- **PolicyEngine** classifies every tool call as GREEN (auto-execute), YELLOW (confirm), or RED (block).
-- **ConfirmationManager** issues single-use, session-bound tokens for YELLOW/RED actions.
-- **ToolVisibility** (`LOCAL_ONLY` / `SHARED`) prevents external LLMs from seeing local-only tools.
+### AuthorizationBoundary (Phase 10)
+All tool execution flows through a single authorization boundary:
+- **PolicyEngine** requires `source` parameter: `"operator"`, `"orchestrator"`, `"mcp"`, `"plan_executor"`, `"step_executor"`, `"agent"`.
+- **Untrusted sources** (MCP, planner, step_executor, agent) have `confirmed=True` silently ignored.
+- **RED actions** require `source="operator"` only — orchestrator and all other sources cannot confirm RED.
+- **YELLOW actions** from untrusted sources always require confirmation (operator path).
+
+### Tool Visibility
+- **ToolVisibility** (`LOCAL_ONLY` / `SHARED`) prevents external LLMs and MCP from seeing local-only tools.
+- MCP `tools/list` returns only SHARED tools; `tools/call` blocks LOCAL_ONLY.
+
+### Other Security Components
+- **ConfirmationManager** issues single-use, session-bound tokens for YELLOW/RED actions with timestamps, expiry, and reuse blocking.
 - **AgentSecurityValidator** enforces immutable permissions on agents — agents cannot escalate privileges.
-- **NetGuard** blocks SSRF attacks: private IP blocking, DNS validation, redirect hop-by-hop checking.
+- **AgentToolExecutor** validates permissions at execution time for every tool call.
+- **NetGuard** blocks SSRF attacks: private IP blocking, cloud metadata IPs (`169.254.169.254`, `169.254.169.253`), DNS validation, redirect hop-by-hop checking, `metadata.google.internal` hostname blocking.
 - **AllowlistValidator** prevents directory traversal and validates file paths with symlink resolution.
+- **CORS** configured via `JARVIS_CORS_ORIGINS` env var; production defaults to same-origin only.

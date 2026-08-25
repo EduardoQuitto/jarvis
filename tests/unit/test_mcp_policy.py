@@ -18,7 +18,7 @@ class TestMCPPolicy:
             security_level=SecurityLevel.GREEN,
             parameters_schema={"type": "object", "properties": {}},
         )
-        decision = engine.evaluate(tool, {}, confirmed=False)
+        decision = engine.evaluate(tool, {}, confirmed=False, source="operator")
         assert decision.allowed is True
         assert decision.requires_confirmation is False
 
@@ -29,7 +29,7 @@ class TestMCPPolicy:
             security_level=SecurityLevel.YELLOW,
             parameters_schema={"type": "object", "properties": {"file_path": {"type": "string"}}},
         )
-        decision = engine.evaluate(tool, {"file_path": "/tmp/test.txt"}, confirmed=False)
+        decision = engine.evaluate(tool, {"file_path": "/tmp/test.txt"}, confirmed=False, source="orchestrator")
         assert decision.allowed is False
         assert decision.requires_confirmation is True
 
@@ -41,7 +41,7 @@ class TestMCPPolicy:
             security_level=SecurityLevel.YELLOW,
             parameters_schema={"type": "object", "properties": {"app_name": {"type": "string"}}},
         )
-        decision = engine.evaluate(tool, {"app_name": "notepad"}, confirmed=False)
+        decision = engine.evaluate(tool, {"app_name": "notepad"}, confirmed=False, source="mcp")
         # MCP server checks this: if requires_confirmation → send error
         assert decision.requires_confirmation is True
 
@@ -52,5 +52,5 @@ class TestMCPPolicy:
             security_level=SecurityLevel.YELLOW,
             parameters_schema={"type": "object", "properties": {"file_path": {"type": "string"}}},
         )
-        decision = engine.evaluate(tool, {"file_path": "/tmp/test.txt"}, confirmed=True)
+        decision = engine.evaluate(tool, {"file_path": "/tmp/test.txt"}, confirmed=True, source="operator")
         assert decision.allowed is True

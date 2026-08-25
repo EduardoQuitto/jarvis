@@ -1,4 +1,13 @@
-"""Agent — specialized executor with identity, permissions, and isolated context."""
+"""Agent — specialized executor with identity, permissions, and isolated context.
+
+Security model:
+- Permissions are set at creation and IMMUTABLE
+- All tool execution goes through PolicyEngine with source="agent"
+- Agent cannot set confirmed=True (PolicyEngine ignores it for untrusted sources)
+- Agent cannot access LOCAL_ONLY tools unless can_access_local_only_tools=True
+- AgentSecurityValidator is applied at execution time, not just at creation
+- Agent uses an isolated ToolExecutor that validates permissions per tool call
+"""
 
 import time
 import uuid
@@ -6,7 +15,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from core.contracts.agent import AgentSpec, AgentState, AgentResult, AgentPermission
-from core.contracts.enums import AgentStatus, SecurityLevel
+from core.contracts.enums import AgentStatus, SecurityLevel, ToolVisibility
 from core.contracts.orchestrator import OrchestratorRequest, OrchestratorResponse
 from core.agent.security import AgentSecurityValidator, AgentSecurityError
 from core.events.bus import get_event_bus
@@ -14,6 +23,73 @@ from core.events.models import EventType, SystemEvent
 from core.logger import get_logger
 
 logger = get_logger("jarvis.agent")
+
+# Source identifier for policy enforcement
+SOURCE = "agent"
+
+
+class AgentToolExecutor:
+    """A ToolExecutor wrapper that validates agent permissions before each tool call.
+
+    This ensures that even if the Orchestrator allows a tool, the agent's
+    permissions are checked at execution time.
+    """
+
+    def __init__(self, spec: AgentSpec, tool_executor=None):
+        self._spec = spec
+        self._tool_executor = tool_executor
+
+    def _get_executor(self):
+        if self._tool_executor is None:
+            from core.orchestrator.tool_executor import ToolExecutor
+            self._tool_executor = ToolExecutor()
+        return self._tool_executor
+
+    async def execute_tool_call(
+        self,
+        tool_name: str,
+        arguments: Dict[str, Any],
+        call_id: Optional[str] = None,
+        operator_direct: bool = False,
+        source: str = "agent",
+    ):
+        """Execute a tool call with agent permission validation.
+
+        Raises AgentSecurityError if agent is not allowed to use this tool.
+        """
+        # Validate agent can use this tool at execution time
+        AgentSecurityValidator.validate_tool_execution(
+            self._spec, tool_name, confirmed=operator_direct,
+        )
+
+        # Check visibility
+        from tools.registry import get_tool_registry
+        from tools import register_default_tools
+        registry = get_tool_registry()
+        register_default_tools(registry)
+        tool = registry.get(tool_name)
+        if tool:
+            can_access = AgentSecurityValidator.can_access_tool(
+                self._spec,
+                tool_name,
+                tool.metadata.visibility.value,
+            )
+            if not can_access:
+                raise AgentSecurityError(
+                    f"Agent '{self._spec.name}' cannot access tool '{tool_name}' "
+                    f"(visibility: {tool.metadata.visibility.value}, "
+                    f"local_only_access: {self._spec.permissions.can_access_local_only_tools})"
+                )
+
+        # Execute through the single authorization boundary
+        executor = self._get_executor()
+        return await executor.execute_tool_call(
+            tool_name=tool_name,
+            arguments=arguments,
+            call_id=call_id,
+            operator_direct=False,  # Agent can never confirm
+            source=SOURCE,
+        )
 
 
 class Agent:
@@ -30,9 +106,10 @@ class Agent:
 
     Security model:
     - Permissions are set at creation and IMMUTABLE
-    - All tool execution goes through PolicyEngine
+    - All tool execution goes through PolicyEngine with source="agent"
     - Agent cannot set confirmed=True
     - Agent cannot access LOCAL_ONLY tools unless can_access_local_only_tools=True
+    - AgentSecurityValidator is applied at execution time for every tool call
     """
 
     def __init__(self, spec: AgentSpec):
@@ -68,20 +145,32 @@ class Agent:
         )
 
     def _get_orchestrator(self):
-        """Lazy-initialize the orchestrator for this agent."""
+        """Lazy-initialize the orchestrator for this agent.
+
+        Uses an AgentToolExecutor that validates permissions per tool call.
+        """
         if self._orchestrator is None:
             from core.orchestrator.engine import Orchestrator
-            from core.orchestrator.confirmation import get_confirmation_manager
+            from core.orchestrator.tool_executor import ToolExecutor
+            from core.orchestrator.confirmation import ConfirmationManager
 
-            # Agent uses its OWN confirmation manager instance
-            # This isolates confirmations between agents
+            # Create an agent-specific ToolExecutor that validates permissions
+            agent_executor = AgentToolExecutor(
+                spec=self._spec,
+                tool_executor=ToolExecutor(),
+            )
+
+            # Create an agent-specific confirmation manager (isolated)
+            agent_confirmations = ConfirmationManager()
+
             self._orchestrator = Orchestrator(
-                confirmation_manager=get_confirmation_manager(),
+                tool_executor=agent_executor,
+                confirmation_manager=agent_confirmations,
             )
         return self._orchestrator
 
     def _filter_tools(self, tool_names: List[str]) -> List[str]:
-        """Filter tool names by agent's permissions.
+        """Filter tool names by agent's permissions and visibility.
 
         If tool_allowlist is empty, no tools are allowed.
         If can_access_local_only_tools is False, only SHARED tools are allowed.
@@ -90,7 +179,19 @@ class Agent:
             return []
 
         allowed = set(self._spec.permissions.tool_allowlist)
-        return [t for t in tool_names if t in allowed]
+        filtered = []
+        for name in tool_names:
+            if name not in allowed:
+                continue
+            # Also check visibility if we can get tool metadata
+            from tools.registry import get_tool_registry
+            registry = get_tool_registry()
+            tool = registry.get(name)
+            if tool and tool.metadata.visibility == ToolVisibility.LOCAL_ONLY:
+                if not self._spec.permissions.can_access_local_only_tools:
+                    continue
+            filtered.append(name)
+        return filtered
 
     def _check_permission(self, tool_name: str) -> bool:
         """Check if this agent is allowed to use a specific tool."""
@@ -106,7 +207,7 @@ class Agent:
         """Execute the agent's objective.
 
         This is the main entry point. The agent:
-        1. Validates permissions
+        1. Validates permissions at execution time
         2. Creates/uses an orchestrator session
         3. Sends the message to the orchestrator
         4. Returns the result
@@ -142,7 +243,7 @@ class Agent:
 
         await self._event_bus.publish(SystemEvent(
             event_type=EventType.AGENT_STARTED,
-            source=f"agent.{self._agent_type}",
+            source=f"agent.{self._spec.agent_type}",
             data={"agent_id": self._agent_id, "objective": self._spec.objective[:100]},
         ))
 

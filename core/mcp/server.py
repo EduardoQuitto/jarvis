@@ -2,12 +2,20 @@
 
 Provides JARVIS tools and capabilities via the MCP protocol,
 allowing external clients to interact with the agent system.
+
+Security model:
+  - MCP clients are treated as UNTRUSTED sources
+  - tools/list returns ONLY SHARED visibility tools (LOCAL_ONLY filtered out)
+  - tools/call cannot execute LOCAL_ONLY tools
+  - confirmed=True is ignored (UNTRUSTED source)
+  - RED actions always require operator (REST) confirmation
 """
 
 import json
 from typing import Any, Dict, List, Optional
 
 from core.contracts.tool import ToolMetadata
+from core.contracts.enums import ToolVisibility
 from tools.registry import ToolRegistry
 from core.logger import get_logger
 
@@ -18,9 +26,13 @@ class MCPServer:
     """MCP Server implementing JSON-RPC 2.0 for tool discovery and execution.
 
     This is a direct implementation — no external MCP SDK dependency.
+
+    Security: MCP is an UNTRUSTED source. Tools are filtered by visibility,
+    and confirmed=True is silently ignored by PolicyEngine.
     """
 
     PROTOCOL_VERSION = "2024-11-05"
+    SOURCE = "mcp"
 
     def __init__(self, tool_registry: Optional[ToolRegistry] = None):
         self._registry = tool_registry
@@ -64,14 +76,24 @@ class MCPServer:
             },
             "serverInfo": {
                 "name": "jarvis-mcp",
-                "version": "0.1.0",
+                "version": "0.5.0",
             },
         }
 
     async def _handle_tools_list(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle tools/list request — return all available tools."""
+        """Handle tools/list request — return ONLY SHARED visibility tools.
+
+        MCP clients are untrusted. LOCAL_ONLY tools (file operations, process
+        management, system metrics) are never exposed to MCP.
+        """
         registry = self._get_registry()
         tools = registry.list_tools()
+
+        # Filter: only SHARED tools visible to MCP
+        shared_tools = [
+            tool for tool in tools
+            if tool.visibility == ToolVisibility.SHARED
+        ]
 
         return {
             "tools": [
@@ -80,12 +102,20 @@ class MCPServer:
                     "description": tool.description,
                     "inputSchema": self._tool_metadata_to_schema(tool),
                 }
-                for tool in tools
+                for tool in shared_tools
             ]
         }
 
     async def _handle_tools_call(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle tools/call request — execute a tool."""
+        """Handle tools/call request — execute a tool with full security checks.
+
+        Security chain:
+        1. Tool must exist in registry
+        2. Tool must be SHARED visibility (LOCAL_ONLY blocked for MCP)
+        3. PolicyEngine evaluates with source="mcp" (confirmed=True ignored)
+        4. YELLOW/RED always require confirmation (MCP cannot confirm)
+        5. Execution through ToolRegistry single authorization boundary
+        """
         tool_name = params.get("name", "")
         arguments = params.get("arguments", {})
 
@@ -102,47 +132,33 @@ class MCPServer:
                 "isError": True,
             }
 
-        # Policy check — MCP never bypasses confirmation
-        from security.policy_engine import PolicyEngine
-        policy = PolicyEngine()
-        decision = policy.evaluate(tool.metadata, arguments, confirmed=False)
-
-        if not decision.allowed and decision.requires_confirmation:
+        # Check visibility: LOCAL_ONLY tools are blocked for MCP
+        if tool.metadata.visibility == ToolVisibility.LOCAL_ONLY:
+            logger.warning(
+                "MCP client attempted to use LOCAL_ONLY tool '%s' — blocked",
+                tool_name,
+            )
             return {
                 "content": [
                     {
                         "type": "text",
                         "text": json.dumps({
-                            "error": f"requires_confirmation",
+                            "error": "access_denied",
                             "tool": tool_name,
-                            "security_level": tool.metadata.security_level.value,
-                            "reason": decision.reason,
+                            "reason": f"Tool '{tool_name}' is LOCAL_ONLY and not accessible via MCP.",
                         }),
                     }
                 ],
                 "isError": True,
             }
 
-        if not decision.allowed:
-            return {
-                "content": [
-                    {
-                        "type": "text",
-                        "text": json.dumps({
-                            "error": f"denied",
-                            "tool": tool_name,
-                            "reason": decision.reason,
-                        }),
-                    }
-                ],
-                "isError": True,
-            }
-
-        # Execute the tool (GREEN or operator-approved)
+        # Execute through single authorization boundary with source="mcp"
+        # PolicyEngine will: ignore confirmed=True, block YELLOW/RED
         result = await registry.execute_tool(
             name=tool_name,
             parameters=arguments,
-            confirmed=False,
+            confirmed=False,  # MCP can never confirm
+            source=self.SOURCE,
         )
 
         return {
@@ -160,15 +176,9 @@ class MCPServer:
         }
 
     def _tool_metadata_to_schema(self, tool: ToolMetadata) -> Dict[str, Any]:
-        """Convert tool metadata to JSON Schema for MCP.
-
-        ToolMetadata.parameters_schema is already a JSON Schema dict
-        (generated by pydantic's model_json_schema()). MCP's inputSchema
-        expects a JSON Schema, so we return it directly.
-        """
+        """Convert tool metadata to JSON Schema for MCP."""
         if tool.parameters_schema:
             return tool.parameters_schema
-
         return {"type": "object", "properties": {}, "required": []}
 
     def _success_response(self, req_id: Any, result: Any) -> Dict[str, Any]:

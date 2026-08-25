@@ -47,16 +47,16 @@ def test_policy_engine_green_yellow_red():
     launch_tool = LaunchApplicationTool()
 
     # GREEN is automatically allowed
-    green_decision = policy.evaluate(echo_tool.metadata, {"message": "hello"}, confirmed=False)
+    green_decision = policy.evaluate(echo_tool.metadata, {"message": "hello"}, confirmed=False, source="operator")
     assert green_decision.allowed is True
 
     # YELLOW without confirmation is blocked
-    yellow_unconfirmed = policy.evaluate(launch_tool.metadata, {"app_name": "notepad"}, confirmed=False)
+    yellow_unconfirmed = policy.evaluate(launch_tool.metadata, {"app_name": "notepad"}, confirmed=False, source="orchestrator")
     assert yellow_unconfirmed.allowed is False
     assert yellow_unconfirmed.requires_confirmation is True
 
     # YELLOW with confirmation is allowed
-    yellow_confirmed = policy.evaluate(launch_tool.metadata, {"app_name": "notepad"}, confirmed=True)
+    yellow_confirmed = policy.evaluate(launch_tool.metadata, {"app_name": "notepad"}, confirmed=True, source="operator")
     assert yellow_confirmed.allowed is True
 
 
@@ -64,9 +64,9 @@ def test_policy_engine_injection_blocking():
     policy = PolicyEngine()
     echo_tool = EchoTool()
 
-    decision = policy.evaluate(echo_tool.metadata, {"message": "hello; reboot"}, confirmed=True)
+    decision = policy.evaluate(echo_tool.metadata, {"message": "hello; reboot"}, confirmed=True, source="operator")
     assert decision.allowed is False
-    assert "sanitization" in decision.reason
+    assert "sanitization" in (decision.reason or "")
 
 
 @pytest.mark.asyncio
@@ -80,12 +80,12 @@ async def test_tool_registry_and_execution():
     assert registry.get("launch_application") is not None
 
     # Test Echo
-    echo_res = await registry.execute_tool("echo", {"message": "JARVIS online"}, confirmed=False)
+    echo_res = await registry.execute_tool("echo", {"message": "JARVIS online"}, confirmed=False, source="operator")
     assert echo_res.success is True
     assert echo_res.data == {"echo": "JARVIS online"}
 
     # Test Telemetry (Real system data)
-    telem_res = await registry.execute_tool("get_system_metrics", {}, confirmed=False)
+    telem_res = await registry.execute_tool("get_system_metrics", {}, confirmed=False, source="operator")
     assert telem_res.success is True
     assert "cpu" in telem_res.data
     assert "memory" in telem_res.data
@@ -93,15 +93,15 @@ async def test_tool_registry_and_execution():
     assert telem_res.data["memory"]["total_bytes"] > 0
 
     # Test List Processes
-    proc_res = await registry.execute_tool("list_processes", {"limit": 5}, confirmed=False)
+    proc_res = await registry.execute_tool("list_processes", {"limit": 5}, confirmed=False, source="operator")
     assert proc_res.success is True
     assert len(proc_res.data["processes"]) <= 5
     assert proc_res.data["total_running"] > 0
 
     # Test Unregistered tool
-    missing_res = await registry.execute_tool("non_existent_tool", {})
+    missing_res = await registry.execute_tool("non_existent_tool", {}, source="operator")
     assert missing_res.success is False
-    assert "not registered" in missing_res.error
+    assert "not registered" in (missing_res.error or "")
 
 
 @pytest.mark.asyncio
@@ -110,12 +110,12 @@ async def test_tool_execution_yellow_security_policy():
     register_default_tools(registry)
 
     # Launch without confirmation must fail
-    res_no_confirm = await registry.execute_tool("launch_application", {"app_name": "notepad"}, confirmed=False)
+    res_no_confirm = await registry.execute_tool("launch_application", {"app_name": "notepad"}, confirmed=False, source="orchestrator")
     assert res_no_confirm.success is False
-    assert "Policy Denied" in res_no_confirm.error
-    assert "requires user confirmation" in res_no_confirm.error
+    assert "Policy Denied" in (res_no_confirm.error or "")
+    assert "requires user confirmation" in (res_no_confirm.error or "")
 
     # Launch unauthorized app with confirmation must fail at allowlist check
-    res_unauth = await registry.execute_tool("launch_application", {"app_name": "malicious_app"}, confirmed=True)
+    res_unauth = await registry.execute_tool("launch_application", {"app_name": "malicious_app"}, confirmed=True, source="operator")
     assert res_unauth.success is False
-    assert "not in the approved allowlist" in res_unauth.error
+    assert "not in the approved allowlist" in (res_unauth.error or "")

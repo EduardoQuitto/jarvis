@@ -1,4 +1,9 @@
-"""Task Plan Executor and State Machine — evolved with replanning support."""
+"""Task Plan Executor and State Machine — evolved with replanning support.
+
+Security: PlanExecutor NEVER pre-confirms steps. All tool executions pass
+through PolicyEngine with source="plan_executor" and confirmed=False.
+When a step requires confirmation, the plan pauses with REQUIRE_APPROVAL.
+"""
 
 import time
 from typing import Dict, Optional, Callable, Awaitable
@@ -14,15 +19,18 @@ from core.logger import get_logger
 
 logger = get_logger("jarvis.plan_executor")
 
+# Source identifier for policy enforcement
+SOURCE = "plan_executor"
+
 
 class PlanExecutor:
     """Orchestrates step-by-step plan execution with policy checks, state transitions, and replanning.
 
-    Evolved features:
-    - ReplanCallback: called when a step fails, returns a ReplanDecision
-    - Skip step support
-    - Alternative step support
-    - Step retry with max_retries
+    Security model:
+    - All tool executions pass through ToolRegistry.execute_tool() with source="plan_executor"
+    - confirmed=True is NEVER used (PolicyEngine ignores it for untrusted sources)
+    - When a step requires confirmation (YELLOW/RED), plan pauses with REQUIRE_APPROVAL
+    - Replanning respects the same security boundaries
     """
 
     def __init__(
@@ -39,14 +47,14 @@ class PlanExecutor:
     async def execute_plan(
         self,
         plan: ExecutionPlan,
-        confirmed_steps: Optional[Dict[str, bool]] = None,
     ) -> PlanResult:
         """Execute all steps in an ExecutionPlan with replanning support.
 
-        If a step fails and replan_callback is set, the callback is invoked
-        to decide what to do next (retry, skip, abort, etc.).
+        Security: No pre-confirmation. All steps go through PolicyEngine
+        with source="plan_executor" and confirmed=False.
+
+        If a step requires confirmation, the plan pauses with REQUIRE_APPROVAL.
         """
-        confirmed_steps = confirmed_steps or {}
         settings = get_settings()
         start_time = time.perf_counter()
         step_results = {}
@@ -61,10 +69,12 @@ class PlanExecutor:
 
             # Check dependencies
             deps_ok = True
+            failed_dep = None
             for dep_id in step.depends_on:
                 dep_res = step_results.get(dep_id)
                 if not dep_res or not dep_res.success:
                     deps_ok = False
+                    failed_dep = dep_id
                     break
 
             if not deps_ok:
@@ -73,7 +83,7 @@ class PlanExecutor:
                     decision = await self.replan_callback(
                         plan.goal_id or plan.plan_id,
                         step.step_id,
-                        f"Dependency '{dep_id}' failed",
+                        f"Dependency '{failed_dep}' failed",
                     )
                     action_result = await self._handle_replan(plan, step, decision, step_results)
                     if action_result == "continue":
@@ -94,14 +104,11 @@ class PlanExecutor:
                         steps_executed=executed_count,
                         total_duration_ms=total_dur,
                         step_results=step_results,
-                        error=f"Dependency '{dep_id}' for step '{step.step_id}' failed.",
+                        error=f"Dependency '{failed_dep}' for step '{step.step_id}' failed.",
                         failed_step_id=step.step_id,
                     )
 
-            # Determine confirmation flag for this step
-            is_confirmed = confirmed_steps.get(step.step_id, False)
-
-            # Execute tool
+            # Execute tool — ALWAYS with confirmed=False (no pre-confirmation)
             step.status = TaskStatus.RUNNING
 
             await self._event_bus.publish(SystemEvent(
@@ -113,7 +120,8 @@ class PlanExecutor:
             result = await self.registry.execute_tool(
                 name=step.tool_name,
                 parameters=step.parameters,
-                confirmed=is_confirmed,
+                confirmed=False,  # NEVER pre-confirm
+                source=SOURCE,
             )
 
             step.result = result
@@ -125,6 +133,7 @@ class PlanExecutor:
                 try:
                     await self.memory.log_audit(
                         AuditEntry(
+                            id=None,
                             node_id=settings.node_id,
                             tool_name=step.tool_name,
                             security_level=step.security_level,
@@ -142,7 +151,10 @@ class PlanExecutor:
                 error_msg = result.error or "Unknown error"
 
                 # Check if it's a confirmation requirement
-                if "requires user confirmation" in error_msg or "requires explicit" in error_msg:
+                if ("requires user confirmation" in error_msg
+                    or "requires explicit" in error_msg
+                    or "cannot confirm actions" in error_msg
+                    or "Confirmation required" in error_msg):
                     step.status = TaskStatus.REQUIRE_APPROVAL
                     plan.status = TaskStatus.REQUIRE_APPROVAL
                     total_dur = (time.perf_counter() - start_time) * 1000.0

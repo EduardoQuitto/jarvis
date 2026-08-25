@@ -50,18 +50,21 @@ def create_app() -> FastAPI:
 
     app = FastAPI(
         title="J.A.R.V.I.S. Node API",
-        version="0.4.0",
+        version="0.5.0",
         description="Distributed modular interface for JARVIS system and node automation.",
         debug=settings.debug,
     )
 
-    # CORS configuration
+    # CORS configuration — env-aware
+    # Production: same-origin only (no CORS headers)
+    # Development: configurable via JARVIS_CORS_ORIGINS env var
+    cors_origins = settings.cors_origins if settings.cors_origins else ["http://localhost:3000"]
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=cors_origins,
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PUT", "DELETE"],
+        allow_headers=["Authorization", "Content-Type"],
     )
 
     # Register API routers

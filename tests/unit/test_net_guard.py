@@ -50,10 +50,26 @@ class TestNetGuard:
                 validate_url("http://router.local/admin")
 
     def test_link_local_blocked(self):
+        # metadata.google.internal is now in blocked hostnames, so it's caught before DNS
+        with pytest.raises(SSRFBlocked, match="Blocked hostname"):
+            validate_url("http://metadata.google.internal/admin")
+
+    def test_cloud_metadata_ip_blocked(self):
+        # 169.254.169.254 is in blocked hostnames, so it's caught before DNS
+        with pytest.raises(SSRFBlocked, match="Blocked hostname"):
+            validate_url("http://169.254.169.254/latest/meta-data/")
+
+    def test_cloud_metadata_gcp_blocked(self):
+        # 169.254.169.253 is in blocked hostnames
+        with pytest.raises(SSRFBlocked, match="Blocked hostname"):
+            validate_url("http://169.254.169.253/computeMetadata/v1/")
+
+    def test_cloud_metadata_ip_resolves_blocked(self):
+        """IP that resolves to cloud metadata is caught at DNS resolution."""
         with patch("security.net_guard.socket.getaddrinfo") as mock_dns:
             mock_dns.return_value = [(socket.AF_INET, 0, 0, '', ('169.254.169.254', 0))]
             with pytest.raises(SSRFBlocked, match="Blocked IP"):
-                validate_url("http://metadata.google.internal/admin")
+                validate_url("http://some-internal-host.example.com/meta-data/")
 
     def test_dns_failure_blocked(self):
         with patch("security.net_guard.socket.getaddrinfo") as mock_dns:
@@ -117,3 +133,9 @@ class TestNetGuardIPBlocked:
 
     def test_loopback_ipv6_blocked(self):
         assert _is_ip_blocked("::1", []) is True
+
+    def test_cloud_metadata_aws_blocked(self):
+        assert _is_ip_blocked("169.254.169.254", []) is True
+
+    def test_cloud_metadata_gcp_blocked(self):
+        assert _is_ip_blocked("169.254.169.253", []) is True

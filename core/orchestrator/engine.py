@@ -41,7 +41,7 @@ class Orchestrator:
 
     Flow:
     1. Receive user message (or confirmation response)
-    2. If confirmation_id provided: consume → approve/deny → resume or cancel
+    2. If confirmation_id provided: consume -> approve/deny -> resume or cancel
     3. Load conversation context
     4. Build system prompt + tools
     5. Call LLM (via provider or router)
@@ -55,7 +55,7 @@ class Orchestrator:
         llm_provider: Optional[BaseLLMProvider] = None,
         router: Optional[Any] = None,
         conversation_manager: Optional[ConversationManager] = None,
-        tool_executor: Optional[ToolExecutor] = None,
+        tool_executor: Optional[Any] = None,
         confirmation_manager: Optional[ConfirmationManager] = None,
     ):
         self._llm = llm_provider
@@ -74,6 +74,8 @@ class Orchestrator:
         """Call the LLM through whatever backend is configured (provider or router)."""
         if self._router is not None:
             return await self._router.route(messages=messages, tools=tools)
+        if self._llm is None:
+            raise RuntimeError("No LLM provider or router configured")
         return await self._llm.generate(messages=messages, tools=tools)
 
     async def _build_tools_list(self):
@@ -151,7 +153,7 @@ class Orchestrator:
                     needs_confirmation=False,
                 )
 
-            # Approved: execute the pending tool call
+            # Approved: execute the pending tool call via operator source
             logger.info("Resuming confirmed tool: %s (cid=%s)", cid_result["tool_name"], request.confirmation_id)
 
             registry, tools = await self._build_tools_list()
@@ -161,6 +163,7 @@ class Orchestrator:
                 tool_name=cid_result["tool_name"],
                 arguments=cid_result["arguments"],
                 call_id=cid_result["call_id"] or "confirmed",
+                source="operator",
             )
 
             await self._event_bus.publish(SystemEvent(
@@ -295,7 +298,9 @@ class Orchestrator:
                 if tool:
                     from security.policy_engine import PolicyEngine
                     policy = PolicyEngine()
-                    decision = policy.evaluate(tool.metadata, arguments, confirmed=False)
+                    decision = policy.evaluate(
+                        tool.metadata, arguments, confirmed=False, source="orchestrator",
+                    )
 
                     if not decision.allowed and decision.requires_confirmation:
                         cid = await self._confirmations.request_confirmation(
@@ -347,11 +352,12 @@ class Orchestrator:
                         messages.append(tool_msg)
                         continue
 
-                # Execute the tool (GREEN or operator-approved)
+                # Execute the tool (GREEN or operator-approved) via orchestrator source
                 result = await self._tool_executor.execute_tool_call(
                     tool_name=tool_name,
                     arguments=arguments,
                     call_id=call_id,
+                    source="orchestrator",
                 )
                 all_tool_results.append(result)
 

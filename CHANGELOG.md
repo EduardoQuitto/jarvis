@@ -5,6 +5,36 @@ All notable changes to the J.A.R.V.I.S. project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-08-25
+
+### Added
+- **Security & Execution Boundary Hardening (Phase 10):**
+  - `source` parameter propagated through PolicyEngine → ToolRegistry → ToolExecutor.
+  - `UNTRUSTED_SOURCES`, `YELLOW_CAPABLE_SOURCES`, `OPERATOR_SOURCES` constants.
+  - MCP Hardening: `tools/list` returns only SHARED tools; `tools/call` blocks LOCAL_ONLY.
+  - PlanExecutor/StepExecutor: `confirmed_steps` removed, `source` propagated.
+  - `AgentToolExecutor` — per-call permission validation for agents.
+  - NetGuard: cloud metadata IP ranges (`169.254.169.254`, `169.254.169.253`) blocked.
+  - NetGuard: `metadata.google.internal` hostname blocked.
+  - CORS: `JARVIS_CORS_ORIGINS` env var for configurable origins.
+  - ConfirmationManager: timestamps, expiry cleanup, reuse blocking, stats.
+  - 28 adversarial security tests covering MCP bypass, confirmed=True bypass, SSRF, path traversal, visibility, confirmation reuse, and more.
+
+### Changed
+- `PolicyEngine.evaluate()` requires `source` parameter (default: `"orchestrator"`).
+- `ToolRegistry.execute_tool()` requires `source` parameter.
+- `ToolExecutor.execute_tool_call()` requires `source` parameter.
+- `PlanExecutor.execute_plan()` no longer accepts `confirmed_steps` parameter.
+- Orchestrator never passes `confirmed=True` from LLM path.
+- CORS middleware restricted: production same-origin only, dev defaults to `localhost:3000`.
+- Version bumped to 0.5.0.
+
+### Security
+- Untrusted sources (MCP, planner, step_executor, agent) have `confirmed=True` silently ignored.
+- RED actions require `source="operator"` only — orchestrator and all other sources cannot confirm RED.
+- YELLOW actions from untrusted sources always require confirmation.
+- LOCAL_ONLY tools blocked from MCP and agent sources.
+
 ## [0.4.0] - 2026-08-24
 
 ### Added

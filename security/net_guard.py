@@ -1,7 +1,7 @@
 """Network Guard — URL validation and SSRF protection for fetch operations.
 
-Blocks requests to loopback, private, link-local, and reserved IP ranges
-by default. Configurable allowlist for LAN access (e.g., Home Assistant).
+Blocks requests to loopback, private, link-local, reserved, and cloud
+metadata IP ranges by default. Configurable allowlist for LAN access.
 """
 
 import ipaddress
@@ -26,7 +26,24 @@ _BLOCKED_NETWORKS = [
     ipaddress.ip_network("fe80::/10"),         # IPv6 link-local
     ipaddress.ip_network("0.0.0.0/8"),         # "this" network
     ipaddress.ip_network("100.64.0.0/10"),     # carrier-grade NAT
+    # Cloud metadata endpoints
+    ipaddress.ip_network("169.254.169.254/32"),  # AWS/GCP/Azure metadata
+    ipaddress.ip_network("169.254.169.253/32"),  # GCP metadata alternate
+    ipaddress.ip_network("fd00:ec2::254/128"),   # AWS IPv6 metadata
 ]
+
+# Hostnames that resolve to cloud metadata
+_BLOCKED_HOSTNAMES = frozenset({
+    "localhost",
+    "127.0.0.1",
+    "::1",
+    "0.0.0.0",
+    "metadata.google.internal",
+    "metadata.google",
+    "instance-data",
+    "169.254.169.254",
+    "169.254.169.253",
+})
 
 
 class SSRFBlocked(Exception):
@@ -69,8 +86,10 @@ def validate_url(url: str, allow_redirects: bool = False) -> str:
 
     Checks:
     - Scheme is http or https
+    - Hostname is not in blocked list
     - Hostname resolves to a non-blocked IP
     - No credentials in URL
+    - Not a cloud metadata endpoint
 
     Args:
         url: The URL to validate.
@@ -98,9 +117,16 @@ def validate_url(url: str, allow_redirects: bool = False) -> str:
     if not hostname:
         raise SSRFBlocked("URL has no hostname")
 
-    # localhost by name
-    if hostname.lower() in ("localhost", "127.0.0.1", "::1", "0.0.0.0"):
+    # Blocked hostname check (before DNS resolution)
+    if hostname.lower() in _BLOCKED_HOSTNAMES:
         raise SSRFBlocked(f"Blocked hostname: {hostname}")
+
+    # Block common cloud metadata patterns in hostname
+    hostname_lower = hostname.lower()
+    if "metadata" in hostname_lower and ("google" in hostname_lower or "azure" in hostname_lower or "aws" in hostname_lower):
+        raise SSRFBlocked(f"Cloud metadata hostname blocked: {hostname}")
+    if hostname_lower.startswith("instance-data"):
+        raise SSRFBlocked(f"Cloud metadata hostname blocked: {hostname}")
 
     # Resolve DNS
     allowed_networks = _get_allowed_networks()

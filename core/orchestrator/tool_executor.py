@@ -1,4 +1,8 @@
-"""Tool Executor — bridges LLM tool calls to the ToolRegistry with policy enforcement."""
+"""Tool Executor — bridges LLM tool calls to the ToolRegistry with policy enforcement.
+
+Single authorization boundary: all tool executions pass through ToolRegistry.execute_tool(),
+which delegates to PolicyEngine. The `source` parameter is propagated from the caller.
+"""
 
 from typing import Any, Dict, Optional
 
@@ -47,13 +51,16 @@ class ToolExecutor:
         arguments: Dict[str, Any],
         call_id: Optional[str] = None,
         operator_direct: bool = False,
+        source: str = "orchestrator",
     ) -> OrchestratorToolResult:
         """Execute a single tool call from the LLM.
 
         Args:
+            tool_name: Name of the tool to execute
+            arguments: Tool call arguments
+            call_id: Unique call identifier
             operator_direct: True only when called from authenticated REST endpoint
-            (require_node_auth) — the operator is directly authorizing the action.
-            LLM/MCP/StepExecutor paths always pass False.
+            source: Origin of the request (propagated to ToolRegistry -> PolicyEngine)
 
         Returns an OrchestratorToolResult with the outcome.
         """
@@ -61,36 +68,13 @@ class ToolExecutor:
             call_id = create_tool_call_id()
 
         registry = self._get_registry()
-        policy = self._get_policy()
 
-        # 1. Validate tool exists
-        tool = registry.get(tool_name)
-        if not tool:
-            logger.warning("Tool '%s' not found in registry", tool_name)
-            return OrchestratorToolResult(
-                tool_name=tool_name,
-                call_id=call_id,
-                success=False,
-                error=f"Tool '{tool_name}' is not registered.",
-            )
-
-        # 2. Policy check
-        decision = policy.evaluate(tool.metadata, arguments, confirmed=operator_direct)
-        if not decision.allowed:
-            logger.info("Policy denied tool '%s': %s", tool_name, decision.reason)
-            return OrchestratorToolResult(
-                tool_name=tool_name,
-                call_id=call_id,
-                success=False,
-                error=f"Policy Denied: {decision.reason}",
-            )
-
-        # 3. Execute
-        logger.info("Executing tool '%s' (operator_direct=%s)", tool_name, operator_direct)
+        # Execute through the single authorization boundary
         result: ToolResult = await registry.execute_tool(
             name=tool_name,
             parameters=arguments,
             confirmed=operator_direct,
+            source=source,
         )
 
         return OrchestratorToolResult(

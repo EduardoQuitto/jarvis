@@ -2,7 +2,7 @@
 
 [![Python 3.13+](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-193%20passing-brightgreen.svg)](#testing)
+[![Tests](https://img.shields.io/badge/tests-230%20passing-brightgreen.svg)](#testing)
 [![Architecture](https://img.shields.io/badge/architecture-modular%20%26%20distributed-green.svg)](#architecture)
 
 J.A.R.V.I.S. is a local, modular, distributed personal AI assistant built with security, portability, and hardware decoupling as core principles.
@@ -13,7 +13,7 @@ It is **not** a cloud chatbot. It is a local intelligence layer that runs on you
 
 ## Current Status
 
-**Phase 9 complete** (Goal Engine + Agent System). 193 tests passing, 0 failures.
+**Phase 10 complete** (Security & Execution Boundary Hardening). 230 tests passing, 0 failures.
 
 ### Implemented
 
@@ -296,7 +296,7 @@ pytest -q --no-header -p no:cacheprovider
 pytest tests/unit/test_goal_engine.py -v
 ```
 
-**193 tests** across unit and integration suites:
+**230 tests** across unit and integration suites:
 - Unit tests: contracts, config, planner, memory, security, tools, router, agents, goals
 - Integration tests: AI pipeline, E2E pipeline, multi-provider flow, goal-agent integration
 
@@ -328,7 +328,7 @@ The test database (`data/jarvis.db`) is **never touched** by tests. Each test ru
 2. Create a feature branch: `git checkout -b feature/my-change`
 3. Make your changes following the project's coding standards (see `docs/AGENTS.md`)
 4. Run the full test suite: `pytest -v`
-5. Ensure all 193 tests pass with 0 failures
+5. Ensure all 230 tests pass with 0 failures
 6. Commit your changes with a clear message
 7. Push and open a Pull Request
 

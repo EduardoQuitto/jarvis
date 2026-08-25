@@ -1,4 +1,8 @@
-"""Task Executor — runs task steps through the agentic loop with retry logic."""
+"""Task Executor — runs task steps through the agentic loop with retry logic.
+
+Security: StepExecutor uses source="step_executor" for all tool executions.
+confirmed=True is NEVER used (PolicyEngine ignores it for untrusted sources).
+"""
 
 import json
 from typing import Any, Dict, List, Optional
@@ -13,12 +17,17 @@ from core.logger import get_logger
 
 logger = get_logger("jarvis.step_executor")
 
+# Source identifier for policy enforcement
+SOURCE = "step_executor"
+
 
 class StepExecutor:
     """Executes tasks by breaking objectives into tool-based steps.
 
     Uses the Orchestrator for LLM interaction and ToolExecutor for direct tool calls.
     Handles retry logic, progress tracking, and error recovery.
+
+    Security: All tool executions use source="step_executor" and confirmed=False.
     """
 
     def __init__(
@@ -79,6 +88,7 @@ class StepExecutor:
         """Execute a single tool call directly, bypassing the LLM loop.
 
         Useful for known, deterministic steps.
+        Security: Uses source="step_executor" and confirmed=False.
         """
         logger.info("Direct tool execution: %s(%s)", tool_name, json.dumps(arguments)[:100])
 
@@ -91,6 +101,7 @@ class StepExecutor:
         result = await self._tool_executor.execute_tool_call(
             tool_name=tool_name,
             arguments=arguments,
+            source=SOURCE,
         )
 
         await self._event_bus.publish(SystemEvent(

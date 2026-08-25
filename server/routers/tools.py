@@ -22,13 +22,18 @@ async def execute_tool(
     request: ToolExecutionRequest,
     _token: str = Depends(require_node_auth),
 ):
-    """Execute a registered tool subject to security policy checks."""
+    """Execute a registered tool subject to security policy checks.
+
+    Security: Uses source="operator" — confirmed=True is honored only for
+    tools the operator is trusted to confirm.
+    """
     registry = get_tool_registry()
     
     result = await registry.execute_tool(
         name=request.tool_name,
         parameters=request.parameters,
         confirmed=request.confirmed,
+        source="operator",
     )
 
     return ToolExecutionResponse(

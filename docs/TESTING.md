@@ -4,7 +4,7 @@
 
 JARVIS uses **pytest** with **pytest-asyncio** for automated testing. The test suite covers unit tests and integration tests across all major components.
 
-**Current status:** 193 tests passing, 0 failures, 0 warnings.
+**Current status:** 230 tests passing, 0 failures, 0 warnings.
 
 ## Running Tests
 

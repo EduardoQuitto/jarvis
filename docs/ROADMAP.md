@@ -77,26 +77,38 @@
 - [x] Novos eventos: GOAL_*, PLAN_*, AGENT_*, REPLANNING_* no EventBus.
 - [x] 37 novos testes (total: 193 testes, 0 falhas, 0 warnings).
 
-### Limitações Conhecidas da Fase 9
+### ✅ Fase 10: Segurança e Reforço dos Limites de Execução (Concluída)
+- [x] AuthorizationBoundary: PolicyEngine reescrito com parâmetro `source`.
+- [x] `UNTRUSTED_SOURCES`, `YELLOW_CAPABLE_SOURCES`, `OPERATOR_SOURCES` definidos.
+- [x] `source` propagação: ToolRegistry → ToolExecutor → Orchestrator.
+- [x] Orchestrator NUNCA passa `confirmed=True` do caminho LLM.
+- [x] Caminho confirmado usa `source="operator"` — único que pode confirmar YELLOW/RED.
+- [x] MCP Hardening: `tools/list` retorna apenas SHARED; `tools/call` bloqueia LOCAL_ONLY.
+- [x] PlanExecutor/StepExecutor: `confirmed_steps` removido, `source` propagado.
+- [x] Agent Security: `AgentToolExecutor` com validação de permissões por chamada.
+- [x] NetGuard: cloud metadata IP ranges (`169.254.169.254`, `169.254.169.253`) e hostname `metadata.google.internal` bloqueados.
+- [x] CORS: configuração via `JARVIS_CORS_ORIGINS`, production same-origin only.
+- [x] ConfirmationManager: timestamps, cleanup de expirados, bloqueio de reuse, log de tentativas.
+- [x] 28 novos testes adversariais (total: 230 testes, 0 falhas, 0 warnings).
 
-* **GoalEngine**: A detecção de complexidade usa heurística por palavras-chave (pode classificar incorretamente requests simples como complexos e vice-versa).
-* **Replanning**: Baseado em retry count e estratégias predefinidas. Replanejamento guiado por LLM ainda não foi implementado.
-* **Agent Factory**: Cria tipos predefinidos de agentes. Dependências entre agentes e memória compartilhada entre agents não são suportadas.
-* **GoalOrchestrator**: Wrapper sobre o Orchestrator existente. A integração completa com o Orchestrator original requer testes de end-to-end adicionais.
-* **Agentes**: São task-scoped (temporários) e não possuem memória persistente entre execuções.
+### Limitações Conhecidas da Fase 10
+
+* **Source parameter**: Todos os chamadores precisam propagar `source` corretamente — callers legados sem source receberão o padrão `"orchestrator"`.
+* **Agent isolation**: Agentes usam ConfirmationManager isolado, mas não possuem memória persistente entre execuções.
+* **CORS**: Em desenvolvimento, permite `http://localhost:3000` por padrão. Em produção, same-origin only (nenhum CORS headers).
 
 ---
 
 ### Próximas Fases (Futuras)
 
-* **Fase 10: Streaming de Respostas** (SSE streaming do Orchestrator para UI, chunks de texto em tempo real).
-* **Fase 11: Persistência de Conversas** (Garantir que conversas sobrevivam a restarts do servidor — já parcialmente implementado via SQLite).
-* **Fase 12: Segurança de Produção** (CORS, rate limiting, validação de chave de API em produção).
+* **Fase 11: Streaming de Respostas** (SSE streaming do Orchestrator para UI, chunks de texto em tempo real).
+* **Fase 12: Persistência de Conversas** (Garantir que conversas sobrevivam a restarts do servidor — já parcialmente implementado via SQLite).
 * **Fase 13: Integração Home Assistant** (Scheduler, automações e Wake-on-LAN no JARVIS Server).
 * **Fase 14: Pipeline de Voz Local** (Wake Word -> VAD -> Whisper -> TTS Piper).
 * **Fase 15: Android & Tablet Dashboard** (Home Assistant Companion + painel HTML ultraleve).
 * **Fase 16: Visão Computacional** (Captura de tela, OCR e análise visual local).
 * **Fase 17: Memória Vetorial & Busca Semântica** (Embeddings locais no i5-14400).
+* **Fase 18: Autonomia Progressiva** (Agentes autônomos com limites de execução, orçamento de tokens e supervisão humana).
 
 ---
 

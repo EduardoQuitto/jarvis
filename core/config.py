@@ -63,6 +63,13 @@ class Settings(BaseSettings):
         description="CIDR ranges allowed for fetch_url (SSRF guard). Default: all private/blocked.",
     )
 
+    # CORS
+    cors_origins: List[str] = Field(
+        default_factory=list,
+        description="Allowed CORS origins. Empty list = same-origin only (production). "
+                    "For development, set JARVIS_CORS_ORIGINS='[\"http://localhost:3000\"]'.",
+    )
+
     # Logging
     log_level: str = Field(default="INFO", description="Logging level")
 

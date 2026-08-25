@@ -66,5 +66,5 @@ curl http://127.0.0.1:8000/health -H "Authorization: Bearer YOUR_API_KEY"
 ## Running Tests Before Deployment
 
 ```bash
-pytest -v    # Ensure all 193 tests pass
+pytest -v    # Ensure all 230 tests pass
 ```
