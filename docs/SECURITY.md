@@ -112,17 +112,19 @@ Tools locais (read_file, launch_application, list_dir) expõem informação sens
 
 ## 7. Testes de Segurança
 
-### Suite de testes (153 total)
+### Suite de testes (193 total)
 * `test_confirmation.py` (9): approve→consume, deny→consume, single-use, session mismatch, wait timeout, list_pending.
 * `test_mcp_policy.py` (4): GREEN accepted, YELLOW requires confirmation, YELLOW blocked in MCP, YELLOW allowed if confirmed.
 * `test_provider_visibility.py` (3): local sees all, external sees only SHARED, empty when no shared.
 * `test_net_guard.py` (21): scheme/credentials/localhost/loopback/private/link-local/DNS failure/redirects, opt-in CIDR, _is_ip_blocked unit tests.
 * `test_file_sandbox.py` (6): valid file, prefix trick, dot-dot traversal, absolute outside, symlink outside, symlink inside.
+* `test_agent_system.py` (22): agent creation, permissions, factory types, security validation.
+* `test_goal_engine.py` (16): goal lifecycle, replanning, event publishing.
 
 ### Execução
 ```bash
 python -m pytest -q --no-header -p no:cacheprovider
-# Resultado: 190 passed, 0 failed, exit 0
+# Resultado: 193 passed, 0 failed, exit 0
 # data/jarvis.db inalterado (D8A125F20EB72BEBE45D0378CECED2A2)
 ```
 

@@ -75,17 +75,31 @@
 - [x] Orchestrator Goal Integration: `core/orchestrator/goal_integration.py` — roteamento inteligente.
 - [x] Novos enums: `GoalStatus`, `AgentStatus`, `ReplanAction` em `core/contracts/enums.py`.
 - [x] Novos eventos: GOAL_*, PLAN_*, AGENT_*, REPLANNING_* no EventBus.
-- [x] 37 novos testes (total: 190 testes, 0 falhas, 0 warnings).
+- [x] 37 novos testes (total: 193 testes, 0 falhas, 0 warnings).
+
+### Limitações Conhecidas da Fase 9
+
+* **GoalEngine**: A detecção de complexidade usa heurística por palavras-chave (pode classificar incorretamente requests simples como complexos e vice-versa).
+* **Replanning**: Baseado em retry count e estratégias predefinidas. Replanejamento guiado por LLM ainda não foi implementado.
+* **Agent Factory**: Cria tipos predefinidos de agentes. Dependências entre agentes e memória compartilhada entre agents não são suportadas.
+* **GoalOrchestrator**: Wrapper sobre o Orchestrator existente. A integração completa com o Orchestrator original requer testes de end-to-end adicionais.
+* **Agentes**: São task-scoped (temporários) e não possuem memória persistente entre execuções.
 
 ---
 
-### ⏳ Próximas Fases (Futuras)
+### Próximas Fases (Futuras)
 
-* **Fase 8: Streaming de Respostas** (SSE streaming do Orchestrator para UI, chunks de texto em tempo real).
-* **Fase 9: Persistência de Conversas** (Garantir que conversas sobrevivam a restarts do servidor — já parcialmente implementado via SQLite).
-* **Fase 10: Segurança de Produção** (CORS, rate limiting, validação de chave de API em produção).
-* **Fase 11: Integração Home Assistant** (Scheduler, automações e Wake-on-LAN no JARVIS Server).
-* **Fase 12: Pipeline de Voz Local** (Wake Word -> VAD -> Whisper -> TTS Piper).
-* **Fase 13: Android & Tablet Dashboard** (Home Assistant Companion + painel HTML ultraleve).
-* **Fase 14: Visão Computacional** (Captura de tela, OCR e análise visual local).
-* **Fase 15: Memória Vetorial & Busca Semântica** (Embeddings locais no i5-14400).
+* **Fase 10: Streaming de Respostas** (SSE streaming do Orchestrator para UI, chunks de texto em tempo real).
+* **Fase 11: Persistência de Conversas** (Garantir que conversas sobrevivam a restarts do servidor — já parcialmente implementado via SQLite).
+* **Fase 12: Segurança de Produção** (CORS, rate limiting, validação de chave de API em produção).
+* **Fase 13: Integração Home Assistant** (Scheduler, automações e Wake-on-LAN no JARVIS Server).
+* **Fase 14: Pipeline de Voz Local** (Wake Word -> VAD -> Whisper -> TTS Piper).
+* **Fase 15: Android & Tablet Dashboard** (Home Assistant Companion + painel HTML ultraleve).
+* **Fase 16: Visão Computacional** (Captura de tela, OCR e análise visual local).
+* **Fase 17: Memória Vetorial & Busca Semântica** (Embeddings locais no i5-14400).
+
+---
+
+### Nota sobre Hardware
+
+O NODE 2 foi originalmente um Pentium G3260. Foi atualizado para um i5-7400 com 8 GB RAM, SSD ~222 GB e HDD 500 GB. O código é projetado para ser portátil e não é otimizado para hardware específico.

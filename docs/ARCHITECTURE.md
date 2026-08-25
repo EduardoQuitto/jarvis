@@ -1,64 +1,123 @@
-# J.A.R.V.I.S. — Arquitetura de Software
+# J.A.R.V.I.S. — Architecture
 
-## 1. Visão Geral
+## 1. Overview
 
-O sistema **J.A.R.V.I.S.** foi projetado como uma arquitetura distribuída, desacoplada e orientada a contratos, garantindo portabilidade absoluta entre nós de hardware e sistemas operacionais.
+JARVIS is designed as a distributed, decoupled, contract-oriented architecture, ensuring portability across hardware nodes and operating systems.
 
 ```mermaid
 graph TD
-    subgraph "Core & Orquestração"
-        Config["core.config (Pydantic Settings)"]
-        Contracts["core.contracts (DTOs & Protocols)"]
-        Planner["core.planner (PlanBuilder & PlanExecutor)"]
+    subgraph "User Interface"
+        ChatAPI["server/routers/chat.py (Chat API)"]
+        MCP["server/routers/mcp.py (MCP Server)"]
     end
 
-    subgraph "Camada de Segurança"
-        Security["security.policy_engine (PolicyEngine)"]
+    subgraph "Core & Orchestration"
+        Config["core.config (Pydantic Settings)"]
+        Contracts["core.contracts (DTOs & Enums)"]
+        Orchestrator["core.orchestrator (Orchestrator + GoalOrchestrator)"]
+        EventBus["core.events.bus (EventBus)"]
+    end
+
+    subgraph "Intelligence & Planning"
+        Router["core.llm.router (IntelligenceRouter)"]
+        ProviderReg["core.llm.registry (ProviderRegistry)"]
+        Planner["core.planner (PlanBuilder + PlanExecutor)"]
+        GoalEngine["core.goal.engine (GoalEngine)"]
+    end
+
+    subgraph "Agent System"
+        AgentFactory["core.agent.factory (AgentFactory)"]
+        AgentRegistry["core.agent.registry (AgentRegistry)"]
+        AgentSec["core.agent.security (AgentSecurityValidator)"]
+        Agent["core.agent.agent (Agent)"]
+    end
+
+    subgraph "Security"
+        PolicyEngine["security.policy_engine (PolicyEngine)"]
+        ConfirmMgr["core.orchestrator.confirmation (ConfirmationManager)"]
         Allowlist["security.allowlist (AllowlistValidator)"]
+        NetGuard["security.net_guard (NetGuard)"]
         Auth["security.auth (RequireNodeAuth)"]
     end
 
-    subgraph "Ferramentas & Execução"
+    subgraph "Tools & Execution"
         ToolRegistry["tools.registry (ToolRegistry)"]
-        BuiltinTools["tools.builtin (Telemetry, Process, App, Echo)"]
-        WinAgent["windows_agent (WindowsSystemCollector, AppManager)"]
+        BuiltinTools["tools.builtin (12 built-in tools)"]
+        WinAgent["windows_agent (WindowsAgent)"]
     end
 
-    subgraph "Persistência & API"
+    subgraph "Persistence"
         Memory["memory.sqlite_provider (SQLiteMemoryProvider)"]
-        Server["server.app (FastAPI REST & Telemetry Endpoints)"]
+        Server["server.app (FastAPI)"]
     end
 
-    Server --> Security
-    Server --> ToolRegistry
-    Planner --> Security
+    ChatAPI --> Orchestrator
+    MCP --> Orchestrator
+    Orchestrator --> PolicyEngine
+    Orchestrator --> Router
+    Orchestrator --> GoalEngine
+    GoalEngine --> AgentFactory
+    GoalEngine --> Planner
+    AgentFactory --> Agent
+    Agent --> ToolRegistry
+    Agent --> AgentSec
+    Router --> ProviderReg
     Planner --> ToolRegistry
     Planner --> Memory
+    ToolRegistry --> PolicyEngine
+    PolicyEngine --> ConfirmMgr
     ToolRegistry --> BuiltinTools
     BuiltinTools --> WinAgent
-    Security --> Allowlist
+    PolicyEngine --> Allowlist
+    BuiltinTools --> NetGuard
+    Server --> Auth
+    EventBus --> Orchestrator
+    EventBus --> GoalEngine
+    EventBus --> Router
 ```
 
 ---
 
-## 2. Divisão Modular de Camadas
+## 2. Module Breakdown
 
-| Módulo | Responsabilidade | Agnóstico de SO? |
-| :--- | :--- | :--- |
-| `core/contracts` | Interfaces abstratas, DTOs e enums do sistema | Sim (100% agnóstico) |
-| `core/config` | Gerenciamento centralizado de configurações e ambientes | Sim (100% agnóstico) |
-| `core/planner` | Construção e execução de planos de tarefas com state machine | Sim (100% agnóstico) |
-| `security/` | Validação de allowlist, controle de níveis e interceptor | Sim (100% agnóstico) |
-| `tools/` | Registro dinâmico e execução tipada de ferramentas | Sim (100% agnóstico) |
-| `memory/` | Persistência assíncrona SQLite e logs de auditoria | Sim (100% agnóstico) |
-| `server/` | Servidor FastAPI, endpoints REST e autenticação | Sim (100% agnóstico) |
-| `windows_agent/` | Coletor de telemetria nativa e processos do Windows | Específico para Windows |
+| Module | Responsibility | OS-Agnostic? |
+|--------|---------------|--------------|
+| `core/contracts` | Interfaces, DTOs, enums | Yes (100%) |
+| `core/config` | Centralized settings (Pydantic) | Yes (100%) |
+| `core/events` | System-wide event bus | Yes (100%) |
+| `core/orchestrator` | LLM-driven agentic loop, confirmation flow | Yes (100%) |
+| `core/planner` | Deterministic plan building and execution | Yes (100%) |
+| `core/goal` | High-level objective lifecycle and replanning | Yes (100%) |
+| `core/agent` | Agent execution, factory, registry, security | Yes (100%) |
+| `core/llm` | LLM providers, routing, circuit breaker | Yes (100%) |
+| `core/conversation` | Conversation context building | Yes (100%) |
+| `core/mcp` | MCP server (JSON-RPC 2.0) | Yes (100%) |
+| `core/task` | Task management and execution | Yes (100%) |
+| `security/` | PolicyEngine, allowlist, auth, SSRF protection | Yes (100%) |
+| `tools/` | Typed tool registration and execution | Yes (100%) |
+| `memory/` | SQLite async persistence + audit trail | Yes (100%) |
+| `server/` | FastAPI REST server and endpoints | Yes (100%) |
+| `windows_agent/` | Native Windows telemetry and process management | Windows only |
 
 ---
 
-## 3. Contratos Fundamentais
+## 3. Core Contracts
 
-1. **`BaseTool`**: Toda ação do sistema herda de `BaseTool` e possui metadados, schema Pydantic de entrada e retorna `ToolResult`.
-2. **`ToolResult`**: Saída padronizada contendo `success: bool`, `data: Any`, `error: Optional[str]`, `execution_time_ms: float` e `security_level: SecurityLevel`.
-3. **`BaseMemoryProvider`**: Interface assíncrona para armazenamento chave-valor e trilhas de auditoria (`AuditEntry`).
-4. **`ExecutionPlan` & `TaskStep`**: Estrutura sequencial e orientada a dependências para tarefas orquestradas.
+1. **`BaseTool`**: Every system action inherits from `BaseTool` with Pydantic input schema and `ToolResult` output.
+2. **`ToolResult`**: Standardized output: `success: bool`, `data: Any`, `error: Optional[str]`, `execution_time_ms: float`, `security_level: SecurityLevel`.
+3. **`BaseMemoryProvider`**: Async interface for key-value storage and audit entries (`AuditEntry`).
+4. **`ExecutionPlan` & `TaskStep`**: Sequential, dependency-oriented task orchestration structure.
+5. **`Goal`**: High-level objective with lifecycle (pending → running → completed/failed/cancelled).
+6. **`AgentSpec`**: Agent specification with identity, permissions, and tool/provider allowlists.
+7. **`AgentPermission`**: Immutable permission set controlling what an agent can do.
+
+---
+
+## 4. Security Architecture
+
+- **PolicyEngine** classifies every tool call as GREEN (auto-execute), YELLOW (confirm), or RED (block).
+- **ConfirmationManager** issues single-use, session-bound tokens for YELLOW/RED actions.
+- **ToolVisibility** (`LOCAL_ONLY` / `SHARED`) prevents external LLMs from seeing local-only tools.
+- **AgentSecurityValidator** enforces immutable permissions on agents — agents cannot escalate privileges.
+- **NetGuard** blocks SSRF attacks: private IP blocking, DNS validation, redirect hop-by-hop checking.
+- **AllowlistValidator** prevents directory traversal and validates file paths with symlink resolution.

@@ -49,3 +49,20 @@ logs/
 
 # Deepwork (local session state)
 .slim/deepwork/
+
+# OpenCode / Dev tool configs (not part of the product)
+opencode.json
+.ignore
+main
+
+# Temporary development artifacts
+Arquivos temporários do opencode/
+
+# Placeholder directories (not yet implemented)
+docker/
+integrations/
+agents/
+android/
+panel/
+vision/
+voice/
