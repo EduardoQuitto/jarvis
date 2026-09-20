@@ -16,7 +16,7 @@ def create_llm_provider(
     """Create an LLM provider instance based on the configured provider name.
 
     Args:
-        provider_name: Override for settings.llm_provider. Values: "ollama", "external", "mock".
+        provider_name: Override for settings.llm_provider. Values: "ollama", "external", "google", "mock".
         **kwargs: Extra arguments passed to the provider constructor.
 
     Returns:
@@ -38,13 +38,23 @@ def create_llm_provider(
         from core.llm.external_provider import ExternalProvider
         return ExternalProvider(**kwargs)
 
+    if name == "google":
+        from core.llm.external_provider import ExternalProvider
+        return ExternalProvider(
+            base_url=kwargs.pop("base_url", settings.google_base_url),
+            model=kwargs.pop("model", settings.google_model),
+            api_key=kwargs.pop("api_key", settings.google_api_key),
+            provider_name=kwargs.pop("provider_name", "google"),
+            **kwargs,
+        )
+
     if name == "mock":
         from core.llm.mock_provider import MockLLMProvider
         return MockLLMProvider(**kwargs)
 
     raise ValueError(
         f"Unsupported LLM provider: '{name}'. "
-        f"Supported: ollama, external, mock. "
+        f"Supported: ollama, external, google, mock. "
         f"Set JARVIS_LLM_PROVIDER env var to one of these."
     )
 
@@ -55,6 +65,7 @@ def create_router():
     Providers are registered based on configuration:
     - Ollama is always registered (priority 10) — will fail health check if unavailable
     - External is registered if external_llm_base_url is configured (priority 5)
+    - Google is registered if google_api_key + google_base_url are configured (priority 7)
     - Mock is registered as fallback (priority 1)
     """
     from core.llm.registry import ProviderRegistry, get_provider_registry
@@ -89,7 +100,28 @@ def create_router():
             )
             logger.info("External provider configured: %s", settings.external_llm_provider or "external")
 
-        # 3. Mock (fallback, always available)
+        # 3. Google AI Studio (Gemini) cloud fallback (priority 7, non-local).
+        # Only when the API key is configured — otherwise Ollama stays primary
+        # and the slot stays disabled. Never outranks Ollama (priority 10).
+        if settings.google_api_key and settings.google_base_url:
+            from core.llm.external_provider import ExternalProvider
+            google = ExternalProvider(
+                base_url=settings.google_base_url,
+                model=settings.google_model,
+                api_key=settings.google_api_key,
+                provider_name="google",
+            )
+            registry.register(
+                name="google",
+                provider=google,
+                priority=7.0,
+                capabilities=["text_generation"],
+                cost_weight=0.5,
+                local=False,
+            )
+            logger.info("Google provider configured: model=%s", settings.google_model)
+
+        # 4. Mock (fallback, always available)
         from core.llm.mock_provider import MockLLMProvider
         mock = MockLLMProvider()
         registry.register(

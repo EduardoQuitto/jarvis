@@ -27,6 +27,7 @@ class TaskCreateRequest(BaseModel):
     objective: str = Field(..., description="Task objective")
     context: Optional[Dict[str, Any]] = Field(default=None, description="Additional context")
     priority: str = Field(default="normal", description="Task priority")
+    conversation_id: Optional[str] = Field(default=None, description="Originating conversation ID")
     device_id: Optional[str] = Field(default=None, description="Device to execute on")
 
 
@@ -49,6 +50,7 @@ async def create_task(
             objective=request.objective,
             context=request.context,
             priority=request.priority,
+            conversation_id=request.conversation_id,
             device_id=request.device_id,
         )
         return {
@@ -129,7 +131,12 @@ async def update_task(
         if request.result is not None:
             updates["result"] = request.result
         if request.error is not None:
-            updates["error"] = request.error
+            # No singular `error` column exists (schema uses `errors`).
+            # Append to the preserved error history instead.
+            task = await manager.get_task(task_id)
+            history = list(task.errors) if task and isinstance(task.errors, list) else []
+            history.append(request.error)
+            updates["errors"] = history
         if request.progress_pct is not None:
             updates["progress_pct"] = request.progress_pct
 

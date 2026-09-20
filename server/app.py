@@ -23,7 +23,20 @@ async def lifespan(app: FastAPI):
     # Startup: Ensure default tools are registered
     registry = get_tool_registry()
     register_default_tools(registry)
+    # Startup: CORE auto-registers on the SERVER when configured.
+    # Non-blocking: registration + heartbeat run in a background task,
+    # so startup never waits on the SERVER.
+    from core.network.node_presence import NodePresenceManager
+    presence = NodePresenceManager.from_settings()
+    if presence is not None:
+        app.state.presence = presence
+        await presence.start()
     yield
+    # Shutdown: stop presence first (cancel heartbeat task, no orphans)
+    presence = getattr(app.state, "presence", None)
+    if presence is not None:
+        await presence.stop()
+        app.state.presence = None
     # Shutdown: close any lingering aiosqlite connections
     import gc
     import core.orchestrator.confirmation as _cm
@@ -53,6 +66,7 @@ def create_app() -> FastAPI:
         version="0.5.0",
         description="Distributed modular interface for JARVIS system and node automation.",
         debug=settings.debug,
+        lifespan=lifespan,
     )
 
     # CORS configuration — env-aware

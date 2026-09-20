@@ -13,7 +13,7 @@ It is **not** a cloud chatbot. It is a local intelligence layer that runs on you
 
 ## Current Status
 
-**Phase 10 complete** (Security & Execution Boundary Hardening). 230 tests passing, 0 failures.
+**Phase 10 complete** (Security & Execution Boundary Hardening) plus the operational CORE ↔ SERVER bridge. 333 tests passing, 0 failures.
 
 ### Implemented
 
@@ -23,12 +23,13 @@ It is **not** a cloud chatbot. It is a local intelligence layer that runs on you
 - **Windows Agent**: Real hardware telemetry collection, GPU detection, process/app management
 - **Memory**: SQLite async provider (key-value + audit trail)
 - **Planner**: Deterministic plan builder and executor with dependency management
-- **Intelligence Router**: Multi-provider fallback with circuit breaker, local/external provider routing
-- **REST API**: FastAPI server with /health, /telemetry, /tools, /chat, /mcp endpoints
-- **Orchestrator**: LLM-driven agentic loop with tool calling and confirmation flow
+- **Intelligence Router**: Multi-provider fallback with circuit breaker; chain Ollama (local, primary) → Google Gemini (cloud) → mock, retry with backoff on transient cloud errors
+- **REST API**: FastAPI server with /health, /telemetry, /tools, /chat, /mcp, /api/devices, /api/tasks endpoints
+- **Orchestrator**: LLM-driven agentic loop with tool calling and confirmation flow (approved YELLOW/RED tools execute; failures reported honestly)
 - **Goal Engine**: High-level objective lifecycle (create/start/complete/fail/cancel) with replanning
 - **Agent System**: Specialized agent execution with immutable permissions, factory, registry, security validation
 - **MCP Server**: JSON-RPC 2.0 endpoint for external clients
+- **CORE ↔ SERVER bridge**: RemoteNodeClient (transport-only HTTP), `remote_server_tool` (SHARED-only proxy), NodePresenceManager (auto-registration + 30s heartbeat), DistributedTaskClient (remote task lifecycle, SERVER persists state)
 
 ### In Progress
 
@@ -296,9 +297,9 @@ pytest -q --no-header -p no:cacheprovider
 pytest tests/unit/test_goal_engine.py -v
 ```
 
-**230 tests** across unit and integration suites:
-- Unit tests: contracts, config, planner, memory, security, tools, router, agents, goals
-- Integration tests: AI pipeline, E2E pipeline, multi-provider flow, goal-agent integration
+**333 tests** across unit and integration suites:
+- Unit tests: contracts, config, planner, memory, security, tools, router, agents, goals, bridge, presence, tasks, Google provider, retry, confirmation flow
+- Integration tests: AI pipeline, E2E pipeline, multi-provider flow, goal-agent integration, mocked bridge/presence/task lifecycles
 
 The test database (`data/jarvis.db`) is **never touched** by tests. Each test runs in an isolated temporary directory.
 
@@ -328,7 +329,7 @@ The test database (`data/jarvis.db`) is **never touched** by tests. Each test ru
 2. Create a feature branch: `git checkout -b feature/my-change`
 3. Make your changes following the project's coding standards (see `docs/AGENTS.md`)
 4. Run the full test suite: `pytest -v`
-5. Ensure all 230 tests pass with 0 failures
+5. Ensure all 333 tests pass with 0 failures
 6. Commit your changes with a clear message
 7. Push and open a Pull Request
 

@@ -1,11 +1,32 @@
 """Tests for file sandbox: prefix trick, traversal, symlink."""
 
+import errno
 import pytest
 import os
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 from security.allowlist import AllowlistValidator, SecurityValidationError
+
+
+def _create_symlink_or_skip(src: Path, link: Path) -> None:
+    """Create a symlink, skipping only when the OS blocks it by policy.
+
+    On Windows, creating symlinks requires the SeCreateSymbolicLink
+    privilege or Developer Mode (WinError 1314). In that case the test
+    cannot exercise real symlink resolution, so it skips with a documented
+    reason instead of failing. Any other OSError is re-raised so real
+    failures are never masked.
+    """
+    try:
+        os.symlink(str(src), str(link))
+    except OSError as e:
+        if getattr(e, "winerror", None) == 1314 or e.errno in (errno.EPERM, errno.EACCES):
+            pytest.skip(
+                "Symlink creation is blocked by OS policy on this machine "
+                "(Windows WinError 1314: privilege or Developer Mode required)."
+            )
+        raise
 
 
 class TestFileSandbox:
@@ -63,7 +84,7 @@ class TestFileSandbox:
         secret = tmp_path / "secret.txt"
         secret.write_text("secret")
         link = workspace / "link"
-        os.symlink(str(secret), str(link))
+        _create_symlink_or_skip(secret, link)
 
         with patch("security.allowlist.get_settings") as mock_settings:
             mock_settings.return_value.allowed_paths = [str(workspace)]
@@ -77,7 +98,7 @@ class TestFileSandbox:
         real = workspace / "real.txt"
         real.write_text("content")
         link = workspace / "link.txt"
-        os.symlink(str(real), str(link))
+        _create_symlink_or_skip(real, link)
 
         with patch("security.allowlist.get_settings") as mock_settings:
             mock_settings.return_value.allowed_paths = [str(workspace)]

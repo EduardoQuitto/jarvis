@@ -4,6 +4,7 @@ Supports Groq, Together AI, OpenRouter, Google Gemini, and any other
 provider that implements the OpenAI /v1/chat/completions format.
 """
 
+import asyncio
 import json
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
@@ -23,6 +24,14 @@ from core.config import get_settings
 from core.logger import get_logger
 
 logger = get_logger("jarvis.llm.external")
+
+# Transient HTTP statuses worth one more attempt (rate limit / overload /
+# gateway errors). Permanent errors (400, 401, 403, 404, ...) never retry.
+RETRYABLE_HTTP_STATUSES = frozenset({408, 429, 500, 502, 503, 504})
+
+# Total attempts including the first call; waits before attempts 2 and 3.
+MAX_ATTEMPTS = 3
+RETRY_BACKOFF_SECONDS = (1.0, 2.0)
 
 
 class ExternalProvider(BaseLLMProvider):
@@ -56,6 +65,11 @@ class ExternalProvider(BaseLLMProvider):
             logger.warning("ExternalProvider: no base_url configured")
         if not self.api_key:
             logger.warning("ExternalProvider: no api_key configured")
+
+    @property
+    def provider_name(self) -> str:
+        """Human-readable provider name (e.g. "google", "groq", "external")."""
+        return self._provider_name
 
     def _build_headers(self) -> Dict[str, str]:
         headers = {"Content-Type": "application/json"}
@@ -166,39 +180,55 @@ class ExternalProvider(BaseLLMProvider):
         if max_tokens:
             payload["max_tokens"] = max_tokens
 
-        try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                resp = await client.post(
-                    f"{self.base_url}/chat/completions",
-                    headers=self._build_headers(),
-                    json=payload,
+        url = f"{self.base_url}/chat/completions"
+        headers = self._build_headers()
+        for attempt in range(1, MAX_ATTEMPTS + 1):
+            try:
+                async with httpx.AsyncClient(timeout=self.timeout) as client:
+                    resp = await client.post(url, headers=headers, json=payload)
+                    resp.raise_for_status()
+                    return self._parse_response(resp.json())
+            except httpx.HTTPStatusError as e:
+                status = e.response.status_code
+                if status in RETRYABLE_HTTP_STATUSES and attempt < MAX_ATTEMPTS:
+                    wait = RETRY_BACKOFF_SECONDS[attempt - 1]
+                    logger.warning(
+                        "External provider HTTP %s (attempt %d/%d), retrying in %.0fs",
+                        status, attempt, MAX_ATTEMPTS, wait,
+                    )
+                    await asyncio.sleep(wait)
+                    continue
+                logger.error("External provider HTTP error %s: %s", status, e.response.text[:200])
+                return LLMResponse(
+                    content=None,
+                    tool_calls=[],
+                    finish_reason="stop",
+                    error_msg=f"External provider HTTP error: {status}",
                 )
-                resp.raise_for_status()
-                return self._parse_response(resp.json())
-        except httpx.ConnectError:
-            logger.error("Cannot connect to external provider at %s", self.base_url)
-            return LLMResponse(
-                content=None,
-                tool_calls=[],
-                finish_reason="stop",
-                error_msg=f"External provider not reachable: {self.base_url}",
-            )
-        except httpx.HTTPStatusError as e:
-            logger.error("External provider HTTP error %s: %s", e.response.status_code, e.response.text[:200])
-            return LLMResponse(
-                content=None,
-                tool_calls=[],
-                finish_reason="stop",
-                error_msg=f"External provider HTTP error: {e.response.status_code}",
-            )
-        except Exception as e:
-            logger.error("External provider error: %s", str(e))
-            return LLMResponse(
-                content=None,
-                tool_calls=[],
-                finish_reason="stop",
-                error_msg=f"External provider error: {str(e)}",
-            )
+            except httpx.ConnectError:
+                logger.error("Cannot connect to external provider at %s", self.base_url)
+                return LLMResponse(
+                    content=None,
+                    tool_calls=[],
+                    finish_reason="stop",
+                    error_msg=f"External provider not reachable: {self.base_url}",
+                )
+            except Exception as e:
+                logger.error("External provider error: %s", str(e))
+                return LLMResponse(
+                    content=None,
+                    tool_calls=[],
+                    finish_reason="stop",
+                    error_msg=f"External provider error: {str(e)}",
+                )
+        # Unreachable: the loop always returns. Kept as a safety net that
+        # preserves the no-raise contract.
+        return LLMResponse(
+            content=None,
+            tool_calls=[],
+            finish_reason="stop",
+            error_msg="External provider error: retry loop exhausted",
+        )
 
     async def generate_stream(
         self,

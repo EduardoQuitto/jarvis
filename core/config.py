@@ -30,6 +30,16 @@ class Settings(BaseSettings):
     port: int = Field(default=8000, description="Port to bind HTTP/WS server")
     api_key: str = Field(default="jarvis-dev-insecure-key-change-me", description="Shared API key for node authentication")
 
+    # Remote node (CORE -> SERVER bridge). Empty server_url disables remote tools.
+    server_url: str = Field(default="", description="Base URL of the remote JARVIS SERVER node")
+    server_api_key: str = Field(default="", description="API key used to authenticate against the remote SERVER node")
+    server_timeout: float = Field(default=30.0, description="Timeout in seconds for remote SERVER requests")
+
+    # Presence (CORE auto-registration + heartbeat on the SERVER).
+    server_heartbeat_interval: float = Field(default=30.0, description="Interval in seconds between presence heartbeats")
+    node_advertise_ip: Optional[str] = Field(default="", description="LAN IP announced to the SERVER (empty = not announced)")
+    node_advertise_port: Optional[int] = Field(default=0, description="Port announced to the SERVER (0 = not announced)")
+
     # Security & Policy Settings
     allowlist_enabled: bool = Field(default=True, description="Enforce strict allowlist on actions and apps")
     confirm_yellow_actions: bool = Field(default=True, description="Require confirmation before executing yellow actions")
@@ -56,6 +66,15 @@ class Settings(BaseSettings):
     external_llm_base_url: str = Field(default="", description="Base URL for external LLM API")
     external_llm_model: str = Field(default="", description="Model name for external LLM provider")
     external_llm_provider: str = Field(default="", description="Descriptive name for external provider")
+
+    # Google AI Studio (Gemini) cloud fallback — OpenAI-compatible endpoint.
+    # Empty api_key disables the Google slot in the router.
+    google_api_key: str = Field(default="", description="API key for Google AI Studio")
+    google_model: str = Field(default="gemini-3.7-flash", description="Gemini model name")
+    google_base_url: str = Field(
+        default="https://generativelanguage.googleapis.com/v1beta/openai/",
+        description="Google AI Studio OpenAI-compatible base URL",
+    )
 
     # Network Security — SSRF Protection
     net_allow_private_networks: List[str] = Field(

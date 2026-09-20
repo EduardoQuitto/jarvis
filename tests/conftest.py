@@ -14,6 +14,8 @@ def _isolate_test_environment(tmp_path, monkeypatch):
     """Isolate every test in a clean environment.
 
     - DB path is a per-test temp file (never touches data/jarvis.db).
+    - Node identity and remote-bridge settings are pinned to canonical
+      test defaults, so tests never depend on the developer's real .env.
     - All global singletons are reset between tests.
     - gc.collect() is forced so aiosqlite's non-daemon worker thread
       closes via __del__ instead of hanging pytest at exit.
@@ -21,6 +23,18 @@ def _isolate_test_environment(tmp_path, monkeypatch):
     # 1. Isolate DB
     test_db = str(tmp_path / "test.db")
     monkeypatch.setenv("JARVIS_DB_PATH", test_db)
+    # 1b. Pin node identity to code defaults (real .env may define jarvis-core/CORE)
+    monkeypatch.setenv("JARVIS_NODE_ID", "node2-dev")
+    monkeypatch.setenv("JARVIS_NODE_ROLE", "NODE2")
+    monkeypatch.setenv("JARVIS_ENV", "development")
+    # 1c. Disable the CORE -> SERVER bridge by default (tests that need it
+    # opt in explicitly via monkeypatch.setenv("JARVIS_SERVER_URL", ...))
+    monkeypatch.setenv("JARVIS_SERVER_URL", "")
+    monkeypatch.setenv("JARVIS_SERVER_API_KEY", "")
+    # 1d. Disable the Google cloud slot by default (the developer's real .env
+    # may contain a key; tests that need it opt in explicitly). This keeps
+    # the suite hermetic: no real network, no real credentials.
+    monkeypatch.setenv("JARVIS_GOOGLE_API_KEY", "")
     reset_settings()
 
     # 2. Reset tool registry

@@ -82,6 +82,7 @@ graph TD
 
 | Module | Responsibility | OS-Agnostic? |
 |--------|---------------|--------------|
+| `core/network` | CORE → SERVER bridge: RemoteNodeClient (HTTP transport only), NodePresenceManager (auto-registration + heartbeat) | Yes (100%) |
 | `core/contracts` | Interfaces, DTOs, enums | Yes (100%) |
 | `core/config` | Centralized settings (Pydantic) | Yes (100%) |
 | `core/events` | System-wide event bus | Yes (100%) |
@@ -125,6 +126,41 @@ All tool execution flows through a single authorization boundary:
 ### Tool Visibility
 - **ToolVisibility** (`LOCAL_ONLY` / `SHARED`) prevents external LLMs and MCP from seeing local-only tools.
 - MCP `tools/list` returns only SHARED tools; `tools/call` blocks LOCAL_ONLY.
+
+### Distributed Presence (CORE → SERVER)
+- On startup (FastAPI lifespan), the Core auto-registers on the SERVER via
+  `POST /api/devices/` (`device_id` = `node_id`, `device_type` = `CORE`,
+  `capabilities` = `["llm"]`) and sends `POST /api/devices/heartbeat`
+  every `JARVIS_SERVER_HEARTBEAT_INTERVAL` seconds (default 30s).
+- Registration/heartbeat run in a background task (`NodePresenceManager`);
+  startup never blocks on the SERVER, and a missing SERVER only logs a
+  warning — local LLM + tools keep working, retry happens next cycle.
+- No inbound endpoint is invented: IP/port are announced only when
+  `JARVIS_NODE_ADVERTISE_IP` / `JARVIS_NODE_ADVERTISE_PORT` are set.
+- Presence is infrastructure, not an LLM tool: the LLM cannot control the
+  heartbeat or change network configuration.
+
+### Distributed Tasks (CORE intelligence, SERVER persistence)
+- The Core administers task lifecycles persisted on the SERVER via
+  `DistributedTaskClient` → `RemoteNodeClient` → `/api/tasks/*`
+  (create, get, list, PATCH progress/status/result, cancel, pause, resume).
+- Planning and LLM stay on the Core; the SERVER SQLite store is the single
+  source of truth for task state. No worker, scheduler, queue, or autonomous
+  execution is introduced on either side.
+- Failure reports use the `errors` history (append-only semantics in the
+  tasks router); there is no singular `error` column and the SQLite schema
+  is unchanged.
+
+### Cloud Fallback (Google AI Studio)
+- The router chain is Ollama (priority 10, local, primary) → Google Gemini
+  (priority 7, `local=False`) → mock (priority 1). The Google slot reuses
+  `ExternalProvider` against the OpenAI-compatible endpoint and is registered
+  only when `JARVIS_GOOGLE_API_KEY` + `JARVIS_GOOGLE_BASE_URL` are set.
+- Non-local providers only ever receive SHARED tools (see Tool Visibility).
+- `ExternalProvider.generate()` retries transient HTTP 408/429/500/502/503/504
+  (3 attempts, ~1s/~2s `asyncio.sleep` backoff); permanent 4xx never retry;
+  failures surface as `LLMResponse(error_msg=...)` so the router falls through.
+  Streaming has no retry in this stage.
 
 ### Other Security Components
 - **ConfirmationManager** issues single-use, session-bound tokens for YELLOW/RED actions with timestamps, expiry, and reuse blocking.

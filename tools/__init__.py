@@ -15,10 +15,16 @@ from tools.builtin.screenshot_tool import ScreenshotTool
 from tools.builtin.memory_tool import SearchMemoryTool
 from tools.builtin.internet_tool import WebSearchTool, FetchUrlTool
 from tools.builtin.task_tool import CreateTaskTool
+from tools.builtin.remote_tool import RemoteServerTool, register_remote_tool
 
 
 def register_default_tools(registry: ToolRegistry) -> None:
-    """Populate registry with standard built-in tools."""
+    """Populate registry with standard built-in tools.
+
+    The CORE -> SERVER bridge tool (remote_server_tool) is registered only
+    when JARVIS_SERVER_URL is configured; otherwise the system works exactly
+    as before without errors.
+    """
     registry.register(EchoTool())
     registry.register(GetSystemMetricsTool())
     registry.register(ListProcessesTool())
@@ -33,6 +39,7 @@ def register_default_tools(registry: ToolRegistry) -> None:
     registry.register(WebSearchTool())
     registry.register(FetchUrlTool())
     registry.register(CreateTaskTool())
+    register_remote_tool(registry)
 
 
 __all__ = [
@@ -55,4 +62,6 @@ __all__ = [
     "WebSearchTool",
     "FetchUrlTool",
     "CreateTaskTool",
+    "RemoteServerTool",
+    "register_remote_tool",
 ]

@@ -97,6 +97,17 @@
 * **Agent isolation**: Agentes usam ConfirmationManager isolado, mas não possuem memória persistente entre execuções.
 * **CORS**: Em desenvolvimento, permite `http://localhost:3000` por padrão. Em produção, same-origin only (nenhum CORS headers).
 
+### Ponte CORE ↔ SERVER + Presença (Em operação)
+- [x] `RemoteNodeClient` — transporte HTTP CORE → SERVER (`/health`, `/tools`, `/tools/execute`), erros padronizados.
+- [x] `remote_server_tool` — proxy controlado: somente tools SHARED, `confirmed=False`, LOCAL_ONLY sempre bloqueado.
+- [x] `NodePresenceManager` — auto-registro (`POST /api/devices/`) + heartbeat (`POST /api/devices/heartbeat`) a cada 30s (configurável via `JARVIS_SERVER_HEARTBEAT_INTERVAL`).
+- [x] SERVER offline não impede o funcionamento local do Core (Ollama + tools locais); retry no próximo ciclo, sem retry agressivo.
+- [x] IP/porta anunciados somente via `JARVIS_NODE_ADVERTISE_IP` / `JARVIS_NODE_ADVERTISE_PORT` (nenhum endpoint de entrada inventado).
+- [x] Task Bridge (`DistributedTaskClient` + 7 métodos no `RemoteNodeClient`): Core cria/consulta/atualiza/completa/falha/cancela/pausa/retoma tasks persistidas no SERVER (`device_id="jarvis-core"`). `PATCH error` traduzido para o histórico `errors` (sem coluna nova, sem schema change). Lifecycle apenas — sem worker/scheduler/queue.
+- [x] Google AI Studio (Gemini) como fallback cloud reutilizando `ExternalProvider` (`JARVIS_GOOGLE_*`, slot `google` priority 7, `local=False`); Ollama segue primário (10), mock por último (1). Cloud só enxerga tools SHARED.
+- [x] Retry com backoff no `ExternalProvider.generate()` (3 tentativas, ~1s/~2s) para 408/429/500/502/503/504; 4xx permanentes nunca retentam; streaming inalterado.
+- [x] Fluxo de confirmação corrigido: aprovação consumida é propagada (`operator_direct`) e falha de tool aprovada nunca é relatada como "Action completed.".
+
 ---
 
 ### Próximas Fases (Futuras)

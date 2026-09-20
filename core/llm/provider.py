@@ -140,6 +140,7 @@ class OllamaProvider(BaseLLMProvider):
             "messages": self._messages_to_dicts(messages),
             "stream": False,
             "temperature": temperature,
+            "reasoning_effort": "none",
         }
         tools_dicts = self._tools_to_dicts(tools)
         if tools_dicts:
@@ -194,13 +195,15 @@ class OllamaProvider(BaseLLMProvider):
             "messages": self._messages_to_dicts(messages),
             "stream": True,
             "temperature": temperature,
+            "reasoning_effort": "none",
         }
+
         tools_dicts = self._tools_to_dicts(tools)
         if tools_dicts:
             payload["tools"] = tools_dicts
+
         if max_tokens:
             payload["max_tokens"] = max_tokens
-
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 async with client.stream(

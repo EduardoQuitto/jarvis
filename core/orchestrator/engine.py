@@ -153,7 +153,13 @@ class Orchestrator:
                     needs_confirmation=False,
                 )
 
-            # Approved: execute the pending tool call via operator source
+            # Approved: execute the pending tool call via operator source.
+            # The confirmation was consumed + approved through the
+            # ConfirmationManager (single-use, session-bound), which IS the
+            # approval origin — so operator_direct=True propagates the
+            # approval to PolicyEngine. Without it, approved YELLOW/RED
+            # tools would be denied again here. The LLM path can never set
+            # this flag; only this approved-resume branch passes True.
             logger.info("Resuming confirmed tool: %s (cid=%s)", cid_result["tool_name"], request.confirmation_id)
 
             registry, tools = await self._build_tools_list()
@@ -163,6 +169,7 @@ class Orchestrator:
                 tool_name=cid_result["tool_name"],
                 arguments=cid_result["arguments"],
                 call_id=cid_result["call_id"] or "confirmed",
+                operator_direct=True,
                 source="operator",
             )
 
@@ -195,9 +202,15 @@ class Orchestrator:
             )
             messages.append(tool_msg)
 
-            # Single LLM call to summarize the result
+            # Single LLM call to summarize the result. Never mask a tool
+            # failure as success when the LLM returns no summary text.
             response = await self._call_llm(messages=messages, tools=tools)
-            final_text = response.content or "Action completed."
+            if response.content:
+                final_text = response.content
+            elif result.success:
+                final_text = "Action completed."
+            else:
+                final_text = f"Action '{cid_result['tool_name']}' failed: {result.error}"
             await self._conversation.append_message(session_id, "assistant", final_text)
 
             return OrchestratorResponse(
