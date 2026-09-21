@@ -1,7 +1,10 @@
 """Chat API Router — /api/chat endpoints for orchestrator interaction."""
 
+import asyncio
+import json
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from core.contracts.orchestrator import (
@@ -88,6 +91,46 @@ async def send_message(
     except Exception as e:
         logger.error("Chat error: %s", str(e))
         raise HTTPException(status_code=500, detail=f"Chat processing failed: {str(e)}")
+
+
+class ChatStreamRequest(BaseModel):
+    message: str = Field(..., description="User message")
+    session_id: Optional[str] = Field(default=None, description="Existing conversation session ID")
+    device_id: str = Field(default="api", description="Device ID")
+    confirmation_id: Optional[str] = Field(default=None, description="Confirmation ID if responding to a pending confirmation")
+    approved: Optional[bool] = Field(default=None, description="Whether the confirmation is approved (None = not a confirmation response)")
+
+
+@router.post("/stream")
+async def stream_message(
+    request: ChatStreamRequest,
+    _token: str = Depends(optional_node_auth),
+) -> StreamingResponse:
+    """Stream orchestrator processing as Server-Sent Events (Phase 11).
+
+    Same policy gates, persistence and confirmation flow as /send — only
+    the delivery differs (live text_delta events instead of one response).
+    A client disconnect cancels iteration cleanly; no background tasks exist.
+    """
+    orchestrator = _get_orchestrator()
+    orch_request = OrchestratorRequest(
+        message=request.message,
+        session_id=request.session_id,
+        device_id=request.device_id,
+        confirmation_id=request.confirmation_id,
+        approved=request.approved,
+    )
+
+    async def event_generator():
+        try:
+            async for event in orchestrator.stream_message(orch_request):
+                yield f"event: {event.event_type.value.lower()}\ndata: {json.dumps(event.data, default=str)}\n\n"
+        except asyncio.CancelledError:
+            # Normal client disconnect: not a system error, just stop.
+            logger.info("SSE client disconnected mid-stream")
+            raise
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
 class ConfirmRequest(BaseModel):

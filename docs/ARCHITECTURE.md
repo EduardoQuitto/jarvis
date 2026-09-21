@@ -162,6 +162,12 @@ All tool execution flows through a single authorization boundary:
   failures surface as `LLMResponse(error_msg=...)` so the router falls through.
   Streaming has no retry in this stage.
 
+### Streaming (Fase 11)
+- `Orchestrator.stream_message()` espelha o agentic loop do `process_message` emitindo `OrchestratorStreamEvent` (`START`, `THINKING`, `TEXT_DELTA`, `TOOL_CALL`, `TOOL_RESULT`, `WAITING_CONFIRMATION`, `ERROR`, `DONE` — SSE usa o nome em minúsculas).
+- Seleção/fallback de provider continuam em `route_stream()`/`generate_stream()` (sem duplicação); tool calls passam pelos mesmos `PolicyEngine`/`ToolExecutor`/`ConfirmationManager` e pela mesma persistência (sequência OpenAI-compatible preservada).
+- Tool calls em stream são buffered e mesclados por id — nunca tratados como parciais; texto flui delta a delta sem acumular a resposta em memória.
+- `POST /api/chat/stream` entrega `text/event-stream` (`event:` + `data: JSON` + `\n\n`) com a mesma autenticação do `/send`, que permanece inalterado.
+
 ### Other Security Components
 - **ConfirmationManager** issues single-use, session-bound tokens for YELLOW/RED actions with timestamps, expiry, and reuse blocking.
 - **AgentSecurityValidator** enforces immutable permissions on agents — agents cannot escalate privileges.

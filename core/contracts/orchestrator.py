@@ -8,13 +8,16 @@ from pydantic import BaseModel, Field
 
 class OrchestratorMessageType(str, Enum):
     """Types of events the orchestrator can emit."""
+    START = "START"
     THINKING = "THINKING"
+    TEXT_DELTA = "TEXT_DELTA"
     TOOL_CALL = "TOOL_CALL"
     TOOL_RESULT = "TOOL_RESULT"
     WAITING_CONFIRMATION = "WAITING_CONFIRMATION"
     WAITING_USER = "WAITING_USER"
     RESPONSE = "RESPONSE"
     ERROR = "ERROR"
+    DONE = "DONE"
     TASK_CREATED = "TASK_CREATED"
     TASK_STATUS = "TASK_STATUS"
 

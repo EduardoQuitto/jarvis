@@ -9,13 +9,16 @@ Authorization sources for privileged actions:
      The LLM/MCP path NEVER sets operator_direct; only confirmation_id is accepted.
 """
 
+import asyncio
 import json
-from typing import Any, Dict, List, Optional
+from typing import Any, AsyncGenerator, Dict, List, Optional
 
-from core.contracts.llm import BaseLLMProvider, LLMMessage, LLMToolDef
+from core.contracts.llm import BaseLLMProvider, LLMMessage, LLMResponse, LLMToolDef
 from core.contracts.orchestrator import (
+    OrchestratorMessageType,
     OrchestratorRequest,
     OrchestratorResponse,
+    OrchestratorStreamEvent,
     OrchestratorToolResult,
 )
 from core.conversation.manager import ConversationManager
@@ -30,6 +33,51 @@ from core.logger import get_logger
 logger = get_logger("jarvis.orchestrator")
 
 MAX_TOOL_ITERATIONS = 10
+
+
+def _preview_data(data: Any, limit: int = 2000) -> Any:
+    """Size-guarded preview of a tool result payload for streaming.
+
+    Tool results can be large (e.g. base64 screenshots); the full payload
+    stays in history, only a bounded preview travels over SSE.
+    """
+    try:
+        text = data if isinstance(data, str) else json.dumps(data, default=str)
+    except Exception:
+        return {"_unserializable": True}
+    if len(text) > limit:
+        return text[:limit] + "...[truncated]"
+    return data
+
+
+class _StreamTurnAccumulator:
+    """Buffers one streamed LLM turn: live text plus complete tool calls.
+
+    Tool-call deltas are merged by id and only ever used whole — partial
+    argument JSON is never treated as complete (see _merge_tool_call).
+    """
+
+    def __init__(self):
+        self.text = ""
+        self.calls = {}
+
+    def add_tool_delta(self, call) -> None:
+        """Merge one tool-call delta (a complete LLMToolCall) by id."""
+        existing = self.calls.get(call.id)
+        if existing is None:
+            self.calls[call.id] = call
+            return
+        if call.function.name:
+            existing.function.name = call.function.name
+        if call.function.arguments:
+            if isinstance(existing.function.arguments, dict) and isinstance(call.function.arguments, dict):
+                existing.function.arguments.update(call.function.arguments)
+            else:
+                existing.function.arguments = call.function.arguments
+
+    @property
+    def ordered_calls(self):
+        return list(self.calls.values())
 
 
 class Orchestrator:
@@ -77,6 +125,34 @@ class Orchestrator:
         if self._llm is None:
             raise RuntimeError("No LLM provider or router configured")
         return await self._llm.generate(messages=messages, tools=tools)
+
+    def _stream_event(self, event_type: OrchestratorMessageType, **data: Any) -> OrchestratorStreamEvent:
+        """Build one structured streaming event (SSE name = type lowercased)."""
+        return OrchestratorStreamEvent(event_type=event_type, data=data)
+
+    async def _iter_llm_stream(
+        self,
+        messages: List[LLMMessage],
+        tools: Optional[List[LLMToolDef]],
+        acc: "_StreamTurnAccumulator",
+    ) -> AsyncGenerator[str, None]:
+        """Yield live text deltas from the provider/router stream.
+
+        Selection and fallback stay inside route_stream()/generate_stream —
+        never duplicated here. Tool-call deltas are buffered into acc.
+        """
+        if self._router is not None:
+            stream = self._router.route_stream(messages=messages, tools=tools)
+        elif self._llm is not None:
+            stream = self._llm.generate_stream(messages=messages, tools=tools)
+        else:
+            raise RuntimeError("No LLM provider or router configured")
+        async for chunk in stream:
+            if chunk.content_delta:
+                acc.text += chunk.content_delta
+                yield chunk.content_delta
+            for call in chunk.tool_calls_deltas or []:
+                acc.add_tool_delta(call)
 
     async def _build_tools_list(self):
         """Build the tools list for the current session.
@@ -556,4 +632,305 @@ class Orchestrator:
             response_text=final_text,
             tool_calls_made=all_tool_results,
             iterations_used=iterations,
+        )
+
+    async def stream_message(
+        self, request: OrchestratorRequest,
+    ) -> AsyncGenerator[OrchestratorStreamEvent, None]:
+        """Stream orchestrator processing as structured events.
+
+        Mirrors process_message turn for turn (same policy gates, same
+        persistence, same confirmation flow) but emits text as live
+        text_delta events instead of one final response. Every stream ends
+        with done; failures also emit error first. Client disconnects
+        surface as CancelledError and are re-raised untouched: the streaming
+        path creates no background tasks, so nothing can leak.
+        """
+        try:
+            async for event in self._stream_message_inner(request):
+                yield event
+        except asyncio.CancelledError:
+            logger.info("Chat stream cancelled (client disconnect)")
+            raise
+        except Exception as e:
+            logger.error("Streaming failed: %s", str(e))
+            yield self._stream_event(
+                OrchestratorMessageType.ERROR, message=f"Streaming failed: {str(e)}",
+            )
+            yield self._stream_event(
+                OrchestratorMessageType.DONE, error=f"Streaming failed: {str(e)}",
+            )
+
+    async def _stream_confirmation_resume(self, request: OrchestratorRequest, session_id: str):
+        """Stream the confirmation approve/deny resume path."""
+        if request.approved is True:
+            self._confirmations.approve(request.confirmation_id)
+        elif request.approved is False:
+            self._confirmations.deny(request.confirmation_id)
+
+        cid_result = self._confirmations.consume(request.confirmation_id, session_id=session_id)
+
+        if cid_result is None:
+            message = "Confirmation not found, already used, or not yet resolved."
+            yield self._stream_event(OrchestratorMessageType.ERROR, message=message, session_id=session_id)
+            yield self._stream_event(OrchestratorMessageType.DONE, session_id=session_id, error=message)
+            return
+
+        registry, tools = await self._build_tools_list()
+
+        if not cid_result["approved"]:
+            denied_msg_text = f"Action '{cid_result['tool_name']}' was denied by the user and was not executed."
+            await self._persist_tool_result(session_id, LLMMessage(
+                role="tool", content=denied_msg_text,
+                tool_call_id=cid_result["call_id"] or "denied", name=cid_result["tool_name"],
+            ))
+            # Siblings run before the denial text is persisted (see below).
+            remaining_results = []
+            async for item in self._drain_remaining_stream(registry, cid_result, session_id, remaining_results):
+                if isinstance(item, dict):
+                    async for event in self._emit_waiting_confirmation(item, session_id):
+                        yield event
+                    return
+                yield item
+            denial_text = f"Action '{cid_result['tool_name']}' denied by user."
+            await self._conversation.append_message(session_id, "assistant", denial_text)
+            yield self._stream_event(
+                OrchestratorMessageType.DONE, session_id=session_id,
+                response_text=f"Action '{cid_result['tool_name']}' denied.",
+            )
+            return
+
+        # Approved: same operator-direct execution as process_message.
+        logger.info("Resuming confirmed tool: %s (cid=%s)", cid_result["tool_name"], request.confirmation_id)
+        tool = registry.get(cid_result["tool_name"])
+        result = await self._tool_executor.execute_tool_call(
+            tool_name=cid_result["tool_name"],
+            arguments=cid_result["arguments"],
+            call_id=cid_result["call_id"] or "confirmed",
+            operator_direct=True,
+            source="operator",
+        )
+        await self._event_bus.publish(SystemEvent(
+            event_type=EventType.TOOL_RESULT,
+            source="orchestrator",
+            data={"tool_name": cid_result["tool_name"], "call_id": cid_result["call_id"],
+                  "success": result.success, "error": result.error},
+        ))
+        tool_msg = self._build_tool_result_message(
+            cid_result["tool_name"], cid_result["call_id"], result,
+            tool.metadata.security_level if tool else None,
+        )
+        await self._persist_tool_result(session_id, tool_msg)
+        yield self._stream_event(
+            OrchestratorMessageType.TOOL_RESULT, tool_name=result.tool_name, call_id=result.call_id,
+            success=result.success, error=result.error, data_preview=_preview_data(result.data),
+            session_id=session_id,
+        )
+        results = [result]
+
+        async for item in self._drain_remaining_stream(registry, cid_result, session_id, results):
+            if isinstance(item, dict):
+                async for event in self._emit_waiting_confirmation(item, session_id):
+                    yield event
+                return
+            yield item
+
+        # History already holds every persisted result: rebuild and stream
+        # the summary turn live. Tool deltas in a summary turn are ignored,
+        # mirroring process_message (single summary call, no new tools).
+        history = await self._conversation.get_context_window(session_id)
+        system_prompt = build_system_prompt(
+            device_id=request.device_id,
+            device_capabilities=request.device_capabilities,
+            available_tool_names=[t.function.name for t in tools],
+        )
+        messages = self._context_builder.build(system_prompt=system_prompt, conversation_messages=history)
+        acc = _StreamTurnAccumulator()
+        async for delta in self._iter_llm_stream(messages, tools, acc):
+            yield self._stream_event(OrchestratorMessageType.TEXT_DELTA, text=delta, session_id=session_id)
+        failed = [r for r in results if not r.success]
+        if acc.text:
+            final_text = acc.text
+        elif not failed:
+            final_text = "Action completed."
+        else:
+            final_text = f"Action '{failed[0].tool_name}' failed: {failed[0].error}"
+        await self._conversation.append_message(session_id, "assistant", final_text)
+        yield self._stream_event(
+            OrchestratorMessageType.DONE, session_id=session_id,
+            response_text=final_text, iterations_used=1,
+        )
+
+    async def _drain_remaining_stream(self, registry, cid_result, session_id, results):
+        """Process resume-remaining calls, yielding live stream events.
+
+        Appends executed results to `results`. Yields stream events as calls
+        complete. Yields the confirm outcome dict (not an event) when another
+        call needs confirmation — the caller emits waiting_confirmation.
+        """
+        remaining = cid_result.get("remaining_calls") or []
+        for pos, item in enumerate(remaining):
+            yield self._stream_event(
+                OrchestratorMessageType.TOOL_CALL, tool_name=item["tool_name"],
+                arguments=item["arguments"], call_id=item["call_id"], session_id=session_id,
+            )
+            outcome = await self._process_single_call(
+                registry, item["tool_name"], item["arguments"], item["call_id"],
+                session_id, remaining[pos + 1:],
+            )
+            if outcome["action"] == "confirm":
+                yield outcome
+                return
+            if outcome["action"] == "executed":
+                result = outcome["result"]
+                results.append(result)
+                yield self._stream_event(
+                    OrchestratorMessageType.TOOL_RESULT, tool_name=result.tool_name,
+                    call_id=result.call_id, success=result.success, error=result.error,
+                    data_preview=_preview_data(result.data), session_id=session_id,
+                )
+            else:
+                yield self._stream_event(
+                    OrchestratorMessageType.TOOL_RESULT, tool_name=item["tool_name"],
+                    call_id=item["call_id"], success=False,
+                    error=outcome["tool_msg"].content, session_id=session_id,
+                )
+
+    async def _emit_waiting_confirmation(self, confirm: dict, session_id: str):
+        """Yield waiting_confirmation + closing done for a fresh confirmation."""
+        yield self._stream_event(
+            OrchestratorMessageType.WAITING_CONFIRMATION,
+            confirmation_id=confirm["confirmation_id"], tool_name=confirm["tool_name"],
+            security_level=confirm["security_level"], reason=confirm["reason"],
+            session_id=session_id,
+        )
+        yield self._stream_event(
+            OrchestratorMessageType.DONE, session_id=session_id,
+            needs_confirmation=True, confirmation_id=confirm["confirmation_id"],
+        )
+
+    async def _stream_message_inner(self, request: OrchestratorRequest):
+        """Core streaming agentic loop (see stream_message)."""
+        session_id = request.session_id
+        if not session_id:
+            session_id = await self._conversation.create_session(
+                title=request.message[:50],
+                device_id=request.device_id,
+            )
+        yield self._stream_event(OrchestratorMessageType.START, session_id=session_id)
+
+        if request.confirmation_id:
+            async for event in self._stream_confirmation_resume(request, session_id):
+                yield event
+            return
+
+        yield self._stream_event(OrchestratorMessageType.THINKING, session_id=session_id)
+
+        await self._conversation.append_message(session_id, "user", request.message)
+        await self._event_bus.publish(SystemEvent(
+            event_type=EventType.USER_MESSAGE,
+            source=request.device_id,
+            data={"session_id": session_id, "message": request.message},
+        ))
+
+        history = await self._conversation.get_context_window(session_id)
+        registry, tools = await self._build_tools_list()
+        system_prompt = build_system_prompt(
+            device_id=request.device_id,
+            device_capabilities=request.device_capabilities,
+            available_tool_names=[t.function.name for t in tools],
+        )
+        messages = self._context_builder.build(
+            system_prompt=system_prompt,
+            conversation_messages=history,
+        )
+
+        all_results = []
+        iterations = 0
+
+        await self._event_bus.publish(SystemEvent(
+            event_type=EventType.SYSTEM_STATUS,
+            source="orchestrator",
+            data={"status": "THINKING", "session_id": session_id},
+        ))
+
+        while iterations < MAX_TOOL_ITERATIONS:
+            iterations += 1
+            logger.info("LLM streaming iteration %d/%d", iterations, MAX_TOOL_ITERATIONS)
+
+            acc = _StreamTurnAccumulator()
+            async for delta in self._iter_llm_stream(messages, tools, acc):
+                yield self._stream_event(
+                    OrchestratorMessageType.TEXT_DELTA, text=delta, session_id=session_id,
+                )
+
+            if not acc.text and not acc.calls:
+                message = "LLM returned no content (no healthy provider or provider error)."
+                logger.error(message)
+                yield self._stream_event(OrchestratorMessageType.ERROR, message=message, session_id=session_id)
+                yield self._stream_event(
+                    OrchestratorMessageType.DONE, session_id=session_id,
+                    error=message, iterations_used=iterations,
+                )
+                return
+
+            if not acc.calls:
+                final_text = acc.text or ""
+                await self._conversation.append_message(session_id, "assistant", final_text)
+                yield self._stream_event(
+                    OrchestratorMessageType.DONE, session_id=session_id,
+                    response_text=final_text, iterations_used=iterations,
+                    needs_confirmation=False,
+                )
+                return
+
+            assistant_msg = LLMMessage(
+                role="assistant",
+                content=acc.text or "",
+                tool_calls=acc.ordered_calls,
+            )
+            messages.append(assistant_msg)
+            await self._conversation.append_message(
+                session_id, "assistant", acc.text or "",
+                tool_calls_json=json.dumps([tc.model_dump() for tc in acc.ordered_calls]),
+            )
+
+            for idx, tc in enumerate(acc.ordered_calls):
+                remaining = [
+                    {"tool_name": t.function.name, "arguments": t.function.arguments, "call_id": t.id}
+                    for t in acc.ordered_calls[idx + 1:]
+                ]
+                yield self._stream_event(
+                    OrchestratorMessageType.TOOL_CALL, tool_name=tc.function.name,
+                    arguments=tc.function.arguments, call_id=tc.id, session_id=session_id,
+                )
+                outcome = await self._process_single_call(
+                    registry, tc.function.name, tc.function.arguments, tc.id,
+                    session_id, remaining,
+                )
+                if outcome["action"] == "confirm":
+                    async for event in self._emit_waiting_confirmation(outcome, session_id):
+                        yield event
+                    return
+                if outcome["action"] == "executed":
+                    result = outcome["result"]
+                    all_results.append(result)
+                    yield self._stream_event(
+                        OrchestratorMessageType.TOOL_RESULT, tool_name=result.tool_name,
+                        call_id=result.call_id, success=result.success, error=result.error,
+                        data_preview=_preview_data(result.data), session_id=session_id,
+                    )
+                else:
+                    yield self._stream_event(
+                        OrchestratorMessageType.TOOL_RESULT, tool_name=tc.function.name,
+                        call_id=tc.id, success=False, error=outcome["tool_msg"].content,
+                        session_id=session_id,
+                    )
+                messages.append(outcome["tool_msg"])
+
+        final_text = "I've reached the maximum number of tool call iterations. Please try a simpler request."
+        await self._conversation.append_message(session_id, "assistant", final_text)
+        yield self._stream_event(
+            OrchestratorMessageType.DONE, session_id=session_id,
+            response_text=final_text, iterations_used=iterations,
         )

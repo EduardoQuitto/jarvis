@@ -112,7 +112,7 @@
 
 ### Próximas Fases (Futuras)
 
-* **Fase 11: Streaming de Respostas** (SSE streaming do Orchestrator para UI, chunks de texto em tempo real).
+* **Fase 11: Streaming de Respostas** (Concluída) — `Orchestrator.stream_message()` emite eventos estruturados (`start`, `thinking`, `text_delta`, `tool_call`, `tool_result`, `waiting_confirmation`, `error`, `done`) via `POST /api/chat/stream` (SSE `text/event-stream`); mesmos gates de PolicyEngine/ToolExecutor/ConfirmationManager e mesma persistência do `/api/chat/send`; tool calls continuam buffered internamente; disconnect do cliente cancela sem órfãs.
 * **Fase 12: Persistência de Conversas** (Garantir que conversas sobrevivam a restarts do servidor — já parcialmente implementado via SQLite).
 * **Fase 13: Integração Home Assistant** (Scheduler, automações e Wake-on-LAN no JARVIS Server).
 * **Fase 14: Pipeline de Voz Local** (Wake Word -> VAD -> Whisper -> TTS Piper).

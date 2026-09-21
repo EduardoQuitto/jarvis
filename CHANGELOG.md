@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Phase 11 — real-time streaming (SSE):**
+  - `Orchestrator.stream_message()` emitting `OrchestratorStreamEvent` (`START`, `THINKING`, `TEXT_DELTA`, `TOOL_CALL`, `TOOL_RESULT`, `WAITING_CONFIRMATION`, `ERROR`, `DONE`).
+  - `POST /api/chat/stream` serving `text/event-stream` with the same auth, policy gates, persistence and confirmation flow as `/api/chat/send` (unchanged).
+  - Tool calls stream buffered and merged by id (never partial); text flows delta-by-delta; client disconnect cancels cleanly with no orphan tasks.
 - **CORE ↔ SERVER bridge (`core/network/`):**
   - `RemoteNodeClient` — async HTTP transport (health, devices, tools, `POST /tools/execute` with `confirmed=False`), all failures normalized to `RemoteNodeError`.
   - `remote_server_tool` — controlled Core proxy: only SERVER-advertised SHARED tools, `LOCAL_ONLY` always rejected, `ToolResult` standardized.
