@@ -196,7 +196,14 @@ class IntelligenceRouter:
         max_tokens: Optional[int] = None,
         task_type: Optional[str] = None,
     ):
-        """Route a streaming LLM request. Yields StreamChunks from the first healthy provider."""
+        """Route a streaming LLM request. Yields StreamChunks from the first healthy provider.
+
+        Text stays truly streaming (forwarded immediately), but each
+        provider's tool-call deltas are buffered and only flushed when that
+        provider finishes cleanly. A provider failing mid-stream therefore
+        can never mix its partial tool calls with the next provider's: its
+        buffered tool part is discarded along with the failure.
+        """
         all_candidates = await self._registry.get_candidates(task_type=task_type)
         candidates = self._filter_candidates(all_candidates, task_type)
 
@@ -205,20 +212,56 @@ class IntelligenceRouter:
             return
 
         for entry in candidates:
+            # Anything already forwarded to the client (text or a flushed
+            # tool part) forbids trying the next provider: a second
+            # generation would mix two different answers incoherently.
+            emitted_anything = False
             try:
+                buffered_raw = []
+                buffered_calls = []
+                last_finish = "stop"
                 async for chunk in entry.provider.generate_stream(
                     messages=messages,
                     tools=tools,
                     temperature=temperature,
                     max_tokens=max_tokens,
                 ):
-                    yield chunk
+                    if chunk.content_delta:
+                        emitted_anything = True
+                        yield StreamChunk(content_delta=chunk.content_delta)
+                    if chunk.tool_calls_raw or chunk.tool_calls_deltas:
+                        emitted_anything = True
+                    buffered_raw.extend(chunk.tool_calls_raw or [])
+                    buffered_calls.extend(chunk.tool_calls_deltas or [])
+                    if chunk.finish_reason:
+                        last_finish = chunk.finish_reason
+
+                if buffered_raw or buffered_calls:
+                    yield StreamChunk(
+                        content_delta="",
+                        tool_calls_deltas=buffered_calls,
+                        tool_calls_raw=buffered_raw,
+                        finish_reason=last_finish,
+                    )
+                else:
+                    yield StreamChunk(content_delta="", finish_reason=last_finish)
 
                 self._circuit_breaker.record_success(entry.name)
                 return
             except Exception as e:
-                logger.warning("Streaming failed on %s: %s", entry.name, str(e))
+                # The failed provider's buffered tool part is discarded here
+                # (never flushed): tool calls from different providers are
+                # never mixed.
                 self._circuit_breaker.record_failure(entry.name)
+                if emitted_anything:
+                    logger.warning(
+                        "Streaming failed on %s after content was emitted; "
+                        "not trying another provider to avoid mixing answers: %s",
+                        entry.name, str(e),
+                    )
+                    raise
+                logger.warning("Streaming failed on %s before any content, trying next: %s",
+                               entry.name, str(e))
                 continue
 
         yield StreamChunk(content_delta="", finish_reason="stop")

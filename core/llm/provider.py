@@ -14,6 +14,7 @@ from core.contracts.llm import (
     LLMToolDef,
     LLMFunctionCall,
     LLMUsage,
+    RawToolCallDelta,
     StreamChunk,
 )
 from core.config import get_settings
@@ -204,58 +205,59 @@ class OllamaProvider(BaseLLMProvider):
 
         if max_tokens:
             payload["max_tokens"] = max_tokens
-        try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                async with client.stream(
-                    "POST",
-                    f"{self.base_url}/chat/completions",
-                    headers=self._build_headers(),
-                    json=payload,
-                ) as resp:
-                    resp.raise_for_status()
-                    async for line in resp.aiter_lines():
-                        if not line or not line.startswith("data: "):
-                            continue
-                        data_str = line[6:]
-                        if data_str.strip() == "[DONE]":
-                            yield StreamChunk(content_delta="", finish_reason="stop")
-                            return
-                        try:
-                            data = json.loads(data_str)
-                            choice = data.get("choices", [{}])[0]
-                            delta = choice.get("delta", {})
-                            content = delta.get("content", "")
-                            finish = choice.get("finish_reason")
+        # NOTE: transport/streaming failures propagate to the caller (the
+        # router falls back or the orchestrator reports ERROR+DONE). They are
+        # deliberately NOT converted into a fake successful stop chunk here:
+        # that used to blind the router into record_success() with no real
+        # response. Only malformed single SSE lines are skipped below.
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            async with client.stream(
+                "POST",
+                f"{self.base_url}/chat/completions",
+                headers=self._build_headers(),
+                json=payload,
+            ) as resp:
+                resp.raise_for_status()
+                async for line in resp.aiter_lines():
+                    if not line or not line.startswith("data: "):
+                        continue
+                    data_str = line[6:]
+                    if data_str.strip() == "[DONE]":
+                        yield StreamChunk(content_delta="", finish_reason="stop")
+                        return
+                    try:
+                        data = json.loads(data_str)
+                    except json.JSONDecodeError:
+                        continue
+                    choice = data.get("choices", [{}])[0]
+                    delta = choice.get("delta", {})
+                    content = delta.get("content", "")
+                    finish = choice.get("finish_reason")
 
-                            tool_calls_delta = []
-                            for tc in delta.get("tool_calls", []):
-                                func = tc.get("function", {})
-                                args_raw = func.get("arguments", "{}")
-                                try:
-                                    args = json.loads(args_raw) if isinstance(args_raw, str) else args_raw
-                                except json.JSONDecodeError:
-                                    args = {}
-                                tool_calls_delta.append(
-                                    LLMToolCall(
-                                        id=tc.get("id", ""),
-                                        type=tc.get("type", "function"),
-                                        function=LLMFunctionCall(
-                                            name=func.get("name", ""),
-                                            arguments=args,
-                                        ),
-                                    )
-                                )
-
-                            yield StreamChunk(
-                                content_delta=content,
-                                tool_calls_deltas=tool_calls_delta,
-                                finish_reason=finish,
+                    # Raw fragments only: argument JSON often arrives split
+                    # across chunks, and parsing a fragment here would
+                    # silently discard it. Parsing happens once the
+                    # turn ends (see _StreamTurnAccumulator).
+                    tool_calls_raw = []
+                    for tc in delta.get("tool_calls", []):
+                        func = tc.get("function", {})
+                        args_raw = func.get("arguments", "")
+                        if not isinstance(args_raw, str):
+                            args_raw = json.dumps(args_raw)
+                        tool_calls_raw.append(
+                            RawToolCallDelta(
+                                id=tc.get("id", ""),
+                                type=tc.get("type", "function"),
+                                name=func.get("name", ""),
+                                arguments_str=args_raw,
                             )
-                        except json.JSONDecodeError:
-                            continue
-        except Exception as e:
-            logger.error("Ollama streaming error: %s", str(e))
-            yield StreamChunk(content_delta="", finish_reason="stop")
+                        )
+
+                    yield StreamChunk(
+                        content_delta=content,
+                        tool_calls_raw=tool_calls_raw,
+                        finish_reason=finish,
+                    )
 
     async def health_check(self) -> bool:
         """Check if Ollama is reachable."""

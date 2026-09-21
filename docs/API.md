@@ -129,6 +129,27 @@ Endpoint principal de interação com o assistente.
 3. Usuário aprova: `POST /chat` com mesma `message` + `approved=true` + `session_id`.
 4. Orchestrator confirma → consome cid (single-use) → executa tool → LLM gera resumo.
 
+### 5b. `POST /api/chat/stream` (SSE, Fase 11)
+Mesmo fluxo e segurança do `/api/chat/send`, com entrega em tempo real.
+* **Corpo da Requisição:** igual ao `/send` (`message`, `session_id`, `device_id`, `confirmation_id`, `approved`); autenticação Bearer idêntica.
+* **Resposta:** `text/event-stream`, um evento por bloco:
+```
+event: start
+data: {"session_id": "sess-abc123"}
+
+event: thinking
+data: {"session_id": "sess-abc123"}
+
+event: text_delta
+data: {"text": "Olá", "session_id": "sess-abc123"}
+
+event: done
+data: {"session_id": "sess-abc123", "response_text": "Olá Eduardo", "iterations_used": 1, "needs_confirmation": false}
+```
+* **Eventos possíveis:** `start`, `thinking`, `text_delta`, `tool_call`, `tool_result`, `waiting_confirmation` (com `confirmation_id`, `tool_name`, `security_level`, `reason`), `error`, `done`. Todo stream termina com `done`; falhas também emitem `error` antes.
+* **Confirmação via stream:** YELLOW/RED pausa com `waiting_confirmation` + `done` (`needs_confirmation: true`); após aprovar, o cliente abre outro stream (mesmo `session_id` + `confirmation_id` + `approved: true`).
+* **Notas:** tool calls trafegam buffered (argumentos sempre completos); `tool_result` inclui `data_preview` limitado a 2000 chars; disconnect do cliente cancela sem tarefas órfãs.
+
 ---
 
 ## MCP Server (JSON-RPC 2.0)

@@ -57,10 +57,26 @@ class LLMResponse(BaseModel):
     error_msg: Optional[str] = Field(default=None, description="Error message if the provider failed")
 
 
+class RawToolCallDelta(BaseModel):
+    """One raw tool-call fragment from a streaming response.
+
+    Arguments travel as the exact received string and must NOT be parsed
+    per chunk: JSON frequently arrives split across chunks, and parsing a
+    fragment would silently discard it. The consumer concatenates fragments
+    per call id (preserving order) and parses the complete JSON once the
+    turn ends.
+    """
+    id: str = Field(default="", description="Tool call identifier (stable across fragments)")
+    type: str = Field(default="function", description="Tool call type")
+    name: str = Field(default="", description="Function name (usually present in the first fragment)")
+    arguments_str: str = Field(default="", description="Raw argument fragment, concatenated in order")
+
+
 class StreamChunk(BaseModel):
     """A single chunk from a streaming response."""
     content_delta: str = Field(default="", description="Text delta to append")
-    tool_calls_deltas: List[LLMToolCall] = Field(default_factory=list, description="Tool call deltas")
+    tool_calls_deltas: List[LLMToolCall] = Field(default_factory=list, description="Complete parsed tool calls (only when whole)")
+    tool_calls_raw: List[RawToolCallDelta] = Field(default_factory=list, description="Raw tool-call fragments to buffer until turn end")
     finish_reason: Optional[str] = Field(default=None, description="Finish reason if last chunk")
 
 

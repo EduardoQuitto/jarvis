@@ -13,7 +13,7 @@ It is **not** a cloud chatbot. It is a local intelligence layer that runs on you
 
 ## Current Status
 
-**Phase 10 complete** (Security & Execution Boundary Hardening) plus the operational CORE ↔ SERVER bridge. 333 tests passing, 0 failures.
+**Phase 10 complete** (Security & Execution Boundary Hardening), operational CORE ↔ SERVER bridge, and **Fase 11 complete** (real-time SSE streaming via `POST /api/chat/stream`). 377 tests collected (375 passing, 0 failures).
 
 ### Implemented
 
@@ -24,7 +24,7 @@ It is **not** a cloud chatbot. It is a local intelligence layer that runs on you
 - **Memory**: SQLite async provider (key-value + audit trail)
 - **Planner**: Deterministic plan builder and executor with dependency management
 - **Intelligence Router**: Multi-provider fallback with circuit breaker; chain Ollama (local, primary) → Google Gemini (cloud) → mock, retry with backoff on transient cloud errors
-- **REST API**: FastAPI server with /health, /telemetry, /tools, /chat, /mcp, /api/devices, /api/tasks endpoints
+- **REST API**: FastAPI server with /health, /telemetry, /tools, /chat, /chat/stream (SSE, Fase 11), /mcp, /api/devices, /api/tasks endpoints
 - **Orchestrator**: LLM-driven agentic loop with tool calling and confirmation flow (approved YELLOW/RED tools execute; failures reported honestly)
 - **Goal Engine**: High-level objective lifecycle (create/start/complete/fail/cancel) with replanning
 - **Agent System**: Specialized agent execution with immutable permissions, factory, registry, security validation
@@ -33,7 +33,6 @@ It is **not** a cloud chatbot. It is a local intelligence layer that runs on you
 
 ### In Progress
 
-- **Streaming responses** (SSE from Orchestrator to UI)
 - **Conversation persistence** (partially via SQLite)
 
 ### Planned (Not Yet Implemented)
@@ -297,8 +296,8 @@ pytest -q --no-header -p no:cacheprovider
 pytest tests/unit/test_goal_engine.py -v
 ```
 
-**333 tests** across unit and integration suites:
-- Unit tests: contracts, config, planner, memory, security, tools, router, agents, goals, bridge, presence, tasks, Google provider, retry, confirmation flow
+**377 tests** across unit and integration suites (375 passing, 2 platform-skipped):
+- Unit tests: contracts, config, planner, memory, security, tools, router, agents, goals, bridge, presence, tasks, Google provider, retry, confirmation flow, streaming
 - Integration tests: AI pipeline, E2E pipeline, multi-provider flow, goal-agent integration, mocked bridge/presence/task lifecycles
 
 The test database (`data/jarvis.db`) is **never touched** by tests. Each test runs in an isolated temporary directory.
@@ -329,7 +328,7 @@ The test database (`data/jarvis.db`) is **never touched** by tests. Each test ru
 2. Create a feature branch: `git checkout -b feature/my-change`
 3. Make your changes following the project's coding standards (see `docs/AGENTS.md`)
 4. Run the full test suite: `pytest -v`
-5. Ensure all 333 tests pass with 0 failures
+5. Ensure all collected tests pass with 0 failures (375 passed, 2 skipped on Windows without symlink privilege)
 6. Commit your changes with a clear message
 7. Push and open a Pull Request
 
