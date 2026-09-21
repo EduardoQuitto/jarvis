@@ -20,7 +20,7 @@ from typing import Any, Dict, Optional, Type
 from pydantic import BaseModel, Field
 
 from core.config import get_settings
-from core.contracts.enums import SecurityLevel, ToolVisibility
+from core.contracts.enums import ParamKind, SecurityLevel, ToolVisibility
 from core.contracts.tool import BaseTool, ToolResult
 from core.logger import get_logger
 from core.network.node_client import RemoteNodeClient, RemoteNodeError
@@ -55,6 +55,9 @@ class RemoteServerTool(BaseTool):
     security_level: SecurityLevel = SecurityLevel.GREEN
     visibility: ToolVisibility = ToolVisibility.LOCAL_ONLY
     args_schema: Optional[Type[BaseModel]] = RemoteServerToolArgs
+    # Only SERVER-advertised SHARED tool names are accepted (checked again
+    # remotely); parameters travel opaquely to the SERVER PolicyEngine.
+    param_kinds: Dict[str, ParamKind] = {"tool_name": ParamKind.IDENT}
 
     def __init__(self, client: Optional[RemoteNodeClient] = None):
         # Optional injected client (used by tests). Otherwise built from settings.

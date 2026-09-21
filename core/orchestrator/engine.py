@@ -96,6 +96,17 @@ class Orchestrator:
             registry.list_tools(), shared_only=shared_only,
         )
 
+    async def _persist_tool_result(self, session_id, tool_msg) -> None:
+        """Persist one tool result so restarts keep a valid sequence.
+
+        The message persisted is byte-identical in content to what the LLM
+        saw, so a reloaded context matches the live one.
+        """
+        await self._conversation.append_message(
+            session_id, "tool", tool_msg.content or "",
+            tool_call_id=tool_msg.tool_call_id, name=tool_msg.name,
+        )
+
     def _build_tool_result_message(self, tool_name, call_id, tool_result, security_level):
         """Convert a tool result to an LLM message."""
         from core.llm.converters import tool_result_to_message
@@ -191,16 +202,23 @@ class Orchestrator:
             )
 
             history = await self._conversation.get_context_window(session_id)
+            # Names come from the exact tool definitions sent to the provider
+            # (already visibility-filtered) — never from the full registry,
+            # so LOCAL_ONLY names can't leak into the prompt of a cloud LLM.
             system_prompt = build_system_prompt(
                 device_id=request.device_id,
                 device_capabilities=request.device_capabilities,
-                available_tool_names=[t.name for t in registry.list_tools()],
+                available_tool_names=[t.function.name for t in tools],
             )
             messages = self._context_builder.build(
                 system_prompt=system_prompt,
                 conversation_messages=history,
             )
             messages.append(tool_msg)
+            # Persist the approved tool result. The assistant(tool_calls) turn
+            # was already persisted when it was requested — only the result
+            # is new here, so this cannot duplicate anything.
+            await self._persist_tool_result(session_id, tool_msg)
 
             # Single LLM call to summarize the result. Never mask a tool
             # failure as success when the LLM returns no summary text.
@@ -233,9 +251,12 @@ class Orchestrator:
         # Get conversation history
         history = await self._conversation.get_context_window(session_id)
 
-        # Build system prompt
+        # Build system prompt. Names come from the exact tool definitions
+        # sent to the provider (already visibility-filtered) — never from
+        # the full registry, so LOCAL_ONLY names can't leak into the prompt
+        # of a cloud LLM.
         registry, tools = await self._build_tools_list()
-        tool_names = [t.name for t in registry.list_tools()]
+        tool_names = [t.function.name for t in tools]
         system_prompt = build_system_prompt(
             device_id=request.device_id,
             device_capabilities=request.device_capabilities,
@@ -292,6 +313,15 @@ class Orchestrator:
                 tool_calls=response.tool_calls,
             )
             messages.append(assistant_msg)
+
+            # Persist the assistant turn WITH its tool calls (single message).
+            # Without this, restarts lose the calls and the reloaded context
+            # starts with orphan tool results. The final text turn (if any)
+            # is persisted separately when it happens.
+            await self._conversation.append_message(
+                session_id, "assistant", response.content or "",
+                tool_calls_json=json.dumps([tc.model_dump() for tc in response.tool_calls]),
+            )
 
             for tc in response.tool_calls:
                 tool_name = tc.function.name
@@ -363,6 +393,7 @@ class Orchestrator:
                             tool.metadata.security_level,
                         )
                         messages.append(tool_msg)
+                        await self._persist_tool_result(session_id, tool_msg)
                         continue
 
                 # Execute the tool (GREEN or operator-approved) via orchestrator source
@@ -391,6 +422,7 @@ class Orchestrator:
                     tool.metadata.security_level if tool else None,
                 )
                 messages.append(tool_msg)
+                await self._persist_tool_result(session_id, tool_msg)
 
         if iterations >= MAX_TOOL_ITERATIONS and not final_text:
             final_text = "I've reached the maximum number of tool call iterations. Please try a simpler request."

@@ -1,10 +1,10 @@
 """Internet tools — web search and URL fetching."""
 
 import json
-from typing import Any, Optional, Type
+from typing import Any, Dict, Optional, Type
 from pydantic import BaseModel, Field
 
-from core.contracts.enums import SecurityLevel, ToolVisibility
+from core.contracts.enums import ParamKind, SecurityLevel, ToolVisibility
 from core.contracts.tool import BaseTool, ToolResult
 
 
@@ -26,6 +26,8 @@ class WebSearchTool(BaseTool):
     security_level: SecurityLevel = SecurityLevel.GREEN
     visibility: ToolVisibility = ToolVisibility.SHARED
     args_schema: Optional[Type[BaseModel]] = WebSearchArgs
+    # The query is sent as an HTTPS query parameter, never to a shell.
+    param_kinds: Dict[str, ParamKind] = {"query": ParamKind.FREE_TEXT}
 
     async def execute(self, **kwargs: Any) -> ToolResult:
         query = kwargs.get("query", "")
@@ -90,6 +92,8 @@ class FetchUrlTool(BaseTool):
     security_level: SecurityLevel = SecurityLevel.GREEN
     visibility: ToolVisibility = ToolVisibility.SHARED
     args_schema: Optional[Type[BaseModel]] = FetchUrlArgs
+    # Full SSRF validation stays in net_guard at execution; policy checks syntax only.
+    param_kinds: Dict[str, ParamKind] = {"url": ParamKind.URL}
 
     MAX_REDIRECTS = 5
     MAX_RESPONSE_BYTES = 512_000  # 512KB

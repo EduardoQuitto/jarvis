@@ -74,11 +74,18 @@ class ConversationManager:
             self._local_sessions[session_id].append(msg)
 
     async def get_history(self, session_id: str, limit: int = 50) -> List[ConversationMessage]:
-        """Retrieve conversation history as ConversationMessage objects."""
+        """Retrieve the most recent conversation history as ConversationMessage objects.
+
+        The sliding window can split an assistant(tool_calls) -> tool(result)
+        sequence; leading orphan `tool` messages (whose assistant call was cut
+        off) are dropped so the context never starts mid-sequence.
+        OpenAI-compatible providers reject payloads starting with an orphan
+        tool message.
+        """
         try:
             mem = self._get_memory()
             rows = await mem.get_conversation_history(session_id, limit=limit)
-            return [
+            messages = [
                 ConversationMessage(
                     id=row["id"],
                     conversation_id=row["conversation_id"],
@@ -91,7 +98,10 @@ class ConversationManager:
                 for row in rows
             ]
         except Exception:
-            return self._local_sessions.get(session_id, [])[-limit:]
+            messages = self._local_sessions.get(session_id, [])[-limit:]
+        while messages and messages[0].role == "tool":
+            messages.pop(0)
+        return messages
 
     async def get_context_window(self, session_id: str) -> List[LLMMessage]:
         """Get the conversation as LLMMessage objects for the context window.

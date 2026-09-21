@@ -61,12 +61,23 @@ def test_policy_engine_green_yellow_red():
 
 
 def test_policy_engine_injection_blocking():
+    # NOTE (Bug 1 fix): echo.message is ParamKind.FREE_TEXT, so shell-looking
+    # text is ALLOWED here — and correctly so, because echo returns its input
+    # as data and never passes it to a shell/subprocess. Sanitizing echo was
+    # the bug (it broke legitimate multiline text, &, $, parens, URLs).
+    # Shell protection now lives on SHELL_ARG/IDENT params, which is where a
+    # value can actually reach process execution. See test_param_kinds.py.
     policy = PolicyEngine()
     echo_tool = EchoTool()
 
-    decision = policy.evaluate(echo_tool.metadata, {"message": "hello; reboot"}, confirmed=True, source="operator")
-    assert decision.allowed is False
-    assert "sanitization" in (decision.reason or "")
+    free = policy.evaluate(echo_tool.metadata, {"message": "hello; reboot"}, confirmed=True, source="operator")
+    assert free.allowed is True
+
+    # The same payload on a shell-bound parameter is still blocked.
+    launch_tool = LaunchApplicationTool()
+    blocked = policy.evaluate(launch_tool.metadata, {"app_name": "notepad; reboot"}, confirmed=True, source="operator")
+    assert blocked.allowed is False
+    assert "sanitization" in (blocked.reason or "")
 
 
 @pytest.mark.asyncio

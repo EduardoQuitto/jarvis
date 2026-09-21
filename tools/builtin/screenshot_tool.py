@@ -1,10 +1,10 @@
 """Screenshot tool for capturing screen content."""
 
 import base64
-from typing import Any, Optional, Type
+from typing import Any, Dict, Optional, Type
 from pydantic import BaseModel, Field
 
-from core.contracts.enums import SecurityLevel
+from core.contracts.enums import ParamKind, SecurityLevel
 from core.contracts.tool import BaseTool, ToolResult
 
 
@@ -19,6 +19,8 @@ class ScreenshotTool(BaseTool):
     description: str = "Capture a screenshot of the screen. Returns the image as base64."
     security_level: SecurityLevel = SecurityLevel.GREEN
     args_schema: Optional[Type[BaseModel]] = ScreenshotArgs
+    # Region is parsed by string comparison only, never by a shell.
+    param_kinds: Dict[str, ParamKind] = {"region": ParamKind.FREE_TEXT}
 
     async def execute(self, **kwargs: Any) -> ToolResult:
         region = kwargs.get("region", "full")

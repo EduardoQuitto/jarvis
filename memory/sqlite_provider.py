@@ -303,10 +303,14 @@ class SQLiteMemoryProvider(BaseMemoryProvider):
         await db.commit()
 
     async def get_conversation_history(self, conversation_id: str, limit: int = 50) -> list:
-        """Get messages from a conversation, oldest first."""
+        """Get the most recent messages from a conversation, oldest first.
+
+        Fetches newest-first (ORDER BY id DESC LIMIT) then reverses, so a
+        long conversation yields its recent tail instead of its beginning.
+        """
         db = await self._get_connection()
         async with db.execute(
-            "SELECT id, conversation_id, role, content, tool_calls_json, tool_call_id, name, created_at FROM conversation_messages WHERE conversation_id = ? ORDER BY id ASC LIMIT ?",
+            "SELECT id, conversation_id, role, content, tool_calls_json, tool_call_id, name, created_at FROM conversation_messages WHERE conversation_id = ? ORDER BY id DESC LIMIT ?",
             (conversation_id, limit),
         ) as cursor:
             rows = await cursor.fetchall()
@@ -321,7 +325,7 @@ class SQLiteMemoryProvider(BaseMemoryProvider):
                     "name": row["name"],
                     "created_at": row["created_at"],
                 }
-                for row in rows
+                for row in reversed(rows)
             ]
 
     async def list_conversations(self, limit: int = 20) -> list:

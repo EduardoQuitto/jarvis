@@ -13,7 +13,7 @@ Sources:
 """
 
 from typing import Any, Dict, Optional
-from core.contracts.enums import SecurityLevel
+from core.contracts.enums import ParamKind, SecurityLevel
 from core.contracts.tool import ToolMetadata
 from core.config import get_settings
 from security.allowlist import AllowlistValidator, SecurityValidationError
@@ -71,6 +71,33 @@ class PolicyEngine:
     def __init__(self, validator: Optional[AllowlistValidator] = None):
         self.validator = validator or AllowlistValidator()
 
+    @staticmethod
+    def _param_kinds(tool: ToolMetadata) -> Dict[str, ParamKind]:
+        """Read declared ParamKinds from tool metadata (unknown -> SHELL_ARG at use site)."""
+        kinds: Dict[str, ParamKind] = {}
+        for name, value in (tool.param_kinds or {}).items():
+            try:
+                kinds[name] = ParamKind(value)
+            except ValueError:
+                kinds[name] = ParamKind.SHELL_ARG
+        return kinds
+
+    def _validate_param(self, name: str, value: str, kind: ParamKind) -> None:
+        """Dispatch a string parameter to the validator matching its kind."""
+        if kind == ParamKind.FREE_TEXT:
+            return  # never reaches a shell; no shell rules apply
+        if kind == ParamKind.PATH:
+            self.validator.validate_sandbox_path(value)
+            return
+        if kind == ParamKind.URL:
+            self.validator.validate_url_syntax(value)
+            return
+        if kind == ParamKind.IDENT:
+            self.validator.validate_ident(value)
+            return
+        # SHELL_ARG (and any unknown kind): strict shell-metachar sanitization
+        self.validator.sanitize_input_string(value)
+
     def evaluate(
         self,
         tool: ToolMetadata,
@@ -95,11 +122,14 @@ class PolicyEngine:
         # For untrusted sources, confirmed=True is silently ignored
         effective_confirmed = confirmed and source not in UNTRUSTED_SOURCES
 
-        # Step 1: Check parameter safety against shell injection / forbidden strings
+        # Step 1: Validate each string parameter according to its declared
+        # ParamKind. Undeclared parameters default to SHELL_ARG (strict),
+        # so protection is never silently dropped.
+        kinds = self._param_kinds(tool)
         for param_name, param_val in parameters.items():
             if isinstance(param_val, str):
                 try:
-                    self.validator.sanitize_input_string(param_val)
+                    self._validate_param(param_name, param_val, kinds.get(param_name, ParamKind.SHELL_ARG))
                 except SecurityValidationError as e:
                     return PolicyDecision.deny(
                         f"Parameter '{param_name}' failed security sanitization: {e}"

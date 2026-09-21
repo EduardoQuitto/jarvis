@@ -1,10 +1,10 @@
 """Create and manage tasks through the LLM."""
 
 import json
-from typing import Any, Optional, Type
+from typing import Any, Dict, Optional, Type
 from pydantic import BaseModel, Field
 
-from core.contracts.enums import SecurityLevel
+from core.contracts.enums import ParamKind, SecurityLevel
 from core.contracts.tool import BaseTool, ToolResult
 
 
@@ -30,6 +30,12 @@ class CreateTaskTool(BaseTool):
     )
     security_level: SecurityLevel = SecurityLevel.YELLOW
     args_schema: Optional[Type[BaseModel]] = CreateTaskArgs
+    # Objective/context persist as data (JSON may contain braces/quotes).
+    param_kinds: Dict[str, ParamKind] = {
+        "objective": ParamKind.FREE_TEXT,
+        "priority": ParamKind.IDENT,
+        "context": ParamKind.FREE_TEXT,
+    }
 
     async def execute(self, **kwargs: Any) -> ToolResult:
         objective = kwargs.get("objective", "")
