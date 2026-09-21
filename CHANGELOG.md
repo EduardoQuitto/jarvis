@@ -21,7 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Google AI Studio (Gemini) cloud fallback:**
   - `JARVIS_GOOGLE_API_KEY/MODEL/BASE_URL` settings; `create_llm_provider("google")` and router slot `google` (priority 7, `local=False`) reusing `ExternalProvider` — Ollama stays primary (10), mock stays last (1).
   - Manual checks (excluded from pytest): `check_google_provider.py`, `check_llm_fallback.py` (real fallback Ollama → Google validated).
-- **ExternalProvider resilience:** limited retry with exponential backoff (3 attempts, ~1s/~2s via `asyncio.sleep`) for transient HTTP 408/429/500/502/503/504 in `generate()`; permanent 4xx never retry; `LLMResponse(error_msg=...)` contract preserved; streaming unchanged.
+- **ExternalProvider resilience:** limited retry with exponential backoff (3 attempts, ~1s/~2s via `asyncio.sleep`) for transient HTTP 408/429/500/502/503/504 in `generate()`; permanent 4xx never retry; `LLMResponse(error_msg=...)`
+contract preserved; streaming failures propagate (no fake success chunks) so `route_stream()` falls back before any
+content and re-raises after content was emitted instead of mixing providers.
 - Tests: 103 new tests (333 total) covering bridge, presence, lifespan, task lifecycle, Google slot, retry/backoff, and the confirmation flow below.
 
 ### Changed

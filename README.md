@@ -13,7 +13,7 @@ It is **not** a cloud chatbot. It is a local intelligence layer that runs on you
 
 ## Current Status
 
-**Phase 10 complete** (Security & Execution Boundary Hardening), operational CORE ↔ SERVER bridge, and **Fase 11 complete** (real-time SSE streaming via `POST /api/chat/stream`). 369 tests passing, 0 failures.
+**Phase 10 complete** (Security & Execution Boundary Hardening), operational CORE ↔ SERVER bridge, and **Fase 11 complete** (real-time SSE streaming via `POST /api/chat/stream`). 377 tests collected (375 passing, 0 failures).
 
 ### Implemented
 
@@ -296,7 +296,7 @@ pytest -q --no-header -p no:cacheprovider
 pytest tests/unit/test_goal_engine.py -v
 ```
 
-**369 tests** across unit and integration suites:
+**377 tests** across unit and integration suites (375 passing, 2 platform-skipped):
 - Unit tests: contracts, config, planner, memory, security, tools, router, agents, goals, bridge, presence, tasks, Google provider, retry, confirmation flow, streaming
 - Integration tests: AI pipeline, E2E pipeline, multi-provider flow, goal-agent integration, mocked bridge/presence/task lifecycles
 
@@ -328,7 +328,7 @@ The test database (`data/jarvis.db`) is **never touched** by tests. Each test ru
 2. Create a feature branch: `git checkout -b feature/my-change`
 3. Make your changes following the project's coding standards (see `docs/AGENTS.md`)
 4. Run the full test suite: `pytest -v`
-5. Ensure all 369 tests pass with 0 failures
+5. Ensure all collected tests pass with 0 failures (375 passed, 2 skipped on Windows without symlink privilege)
 6. Commit your changes with a clear message
 7. Push and open a Pull Request
 
