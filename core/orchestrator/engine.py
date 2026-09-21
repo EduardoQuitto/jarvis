@@ -13,7 +13,14 @@ import asyncio
 import json
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
-from core.contracts.llm import BaseLLMProvider, LLMMessage, LLMResponse, LLMToolDef
+from core.contracts.llm import (
+    BaseLLMProvider,
+    LLMFunctionCall,
+    LLMMessage,
+    LLMResponse,
+    LLMToolCall,
+    LLMToolDef,
+)
 from core.contracts.orchestrator import (
     OrchestratorMessageType,
     OrchestratorRequest,
@@ -51,18 +58,23 @@ def _preview_data(data: Any, limit: int = 2000) -> Any:
 
 
 class _StreamTurnAccumulator:
-    """Buffers one streamed LLM turn: live text plus complete tool calls.
+    """Buffers one streamed LLM turn: live text plus tool calls.
 
-    Tool-call deltas are merged by id and only ever used whole — partial
-    argument JSON is never treated as complete (see _merge_tool_call).
+    Two delta shapes are accepted:
+    - complete LLMToolCall objects (e.g. MockLLMProvider) — stored directly;
+    - RawToolCallDelta fragments (Ollama/External) — argument strings are
+      concatenated per call id IN ORDER and parsed exactly once at turn end.
+      A fragment is never parsed alone, so split JSON is never lost.
     """
 
     def __init__(self):
         self.text = ""
         self.calls = {}
+        self.raw = {}
 
     def add_tool_delta(self, call) -> None:
-        """Merge one tool-call delta (a complete LLMToolCall) by id."""
+        """Merge one complete tool call by id (supersedes any raw fragments)."""
+        self.raw.pop(call.id, None)
         existing = self.calls.get(call.id)
         if existing is None:
             self.calls[call.id] = call
@@ -75,9 +87,48 @@ class _StreamTurnAccumulator:
             else:
                 existing.function.arguments = call.function.arguments
 
-    @property
-    def ordered_calls(self):
-        return list(self.calls.values())
+    def add_tool_raw(self, fragment) -> None:
+        """Append one raw argument fragment, preserving arrival order."""
+        slot = self.raw.setdefault(fragment.id, {"name": "", "parts": []})
+        if fragment.name and not slot["name"]:
+            slot["name"] = fragment.name
+        if fragment.arguments_str:
+            slot["parts"].append(fragment.arguments_str)
+
+    def finalize_calls(self):
+        """Parse buffered raw fragments now that the turn ended.
+
+        Returns (calls, error): calls is the ordered list of complete
+        LLMToolCall objects; error is None on success. On invalid JSON (or
+        missing name) error names the call — the caller must NOT execute it.
+        """
+        merged = dict(self.calls)
+        for call_id, slot in self.raw.items():
+            name = slot["name"]
+            if not name:
+                return None, (
+                    f"Tool call '{call_id}' arrived without a function name; "
+                    f"tool not executed."
+                )
+            full = "".join(slot["parts"]).strip()
+            try:
+                arguments = json.loads(full) if full else {}
+            except json.JSONDecodeError as exc:
+                return None, (
+                    f"Tool call arguments for '{name}' (call '{call_id}') are not "
+                    f"valid JSON after the full stream ({exc}); tool not executed."
+                )
+            if not isinstance(arguments, dict):
+                return None, (
+                    f"Tool call arguments for '{name}' (call '{call_id}') must be "
+                    f"a JSON object; tool not executed."
+                )
+            merged[call_id] = LLMToolCall(
+                id=call_id,
+                type="function",
+                function=LLMFunctionCall(name=name, arguments=arguments),
+            )
+        return list(merged.values()), None
 
 
 class Orchestrator:
@@ -153,6 +204,8 @@ class Orchestrator:
                 yield chunk.content_delta
             for call in chunk.tool_calls_deltas or []:
                 acc.add_tool_delta(call)
+            for fragment in chunk.tool_calls_raw or []:
+                acc.add_tool_raw(fragment)
 
     async def _build_tools_list(self):
         """Build the tools list for the current session.
@@ -864,7 +917,7 @@ class Orchestrator:
                     OrchestratorMessageType.TEXT_DELTA, text=delta, session_id=session_id,
                 )
 
-            if not acc.text and not acc.calls:
+            if not acc.text and not acc.calls and not acc.raw:
                 message = "LLM returned no content (no healthy provider or provider error)."
                 logger.error(message)
                 yield self._stream_event(OrchestratorMessageType.ERROR, message=message, session_id=session_id)
@@ -874,7 +927,20 @@ class Orchestrator:
                 )
                 return
 
-            if not acc.calls:
+            # Raw fragments are parsed exactly once, now that the turn ended.
+            # Invalid JSON aborts the turn explicitly: the tool is NOT
+            # executed, and nothing partial is persisted.
+            calls, parse_error = acc.finalize_calls()
+            if parse_error is not None:
+                logger.error("Streaming turn aborted: %s", parse_error)
+                yield self._stream_event(OrchestratorMessageType.ERROR, message=parse_error, session_id=session_id)
+                yield self._stream_event(
+                    OrchestratorMessageType.DONE, session_id=session_id,
+                    error=parse_error, iterations_used=iterations,
+                )
+                return
+
+            if not calls:
                 final_text = acc.text or ""
                 await self._conversation.append_message(session_id, "assistant", final_text)
                 yield self._stream_event(
@@ -887,18 +953,18 @@ class Orchestrator:
             assistant_msg = LLMMessage(
                 role="assistant",
                 content=acc.text or "",
-                tool_calls=acc.ordered_calls,
+                tool_calls=calls,
             )
             messages.append(assistant_msg)
             await self._conversation.append_message(
                 session_id, "assistant", acc.text or "",
-                tool_calls_json=json.dumps([tc.model_dump() for tc in acc.ordered_calls]),
+                tool_calls_json=json.dumps([tc.model_dump() for tc in calls]),
             )
 
-            for idx, tc in enumerate(acc.ordered_calls):
+            for idx, tc in enumerate(calls):
                 remaining = [
                     {"tool_name": t.function.name, "arguments": t.function.arguments, "call_id": t.id}
-                    for t in acc.ordered_calls[idx + 1:]
+                    for t in calls[idx + 1:]
                 ]
                 yield self._stream_event(
                     OrchestratorMessageType.TOOL_CALL, tool_name=tc.function.name,

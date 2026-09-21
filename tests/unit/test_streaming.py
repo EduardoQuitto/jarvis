@@ -16,7 +16,14 @@ import json
 import pytest
 from unittest.mock import patch
 
-from core.contracts.llm import LLMResponse, LLMToolCall, LLMFunctionCall
+from core.contracts.llm import (
+    BaseLLMProvider,
+    LLMResponse,
+    LLMToolCall,
+    LLMFunctionCall,
+    RawToolCallDelta,
+    StreamChunk,
+)
 from core.contracts.orchestrator import OrchestratorRequest
 from core.conversation.manager import ConversationManager
 from core.llm.mock_provider import MockLLMProvider
@@ -205,6 +212,159 @@ async def test_streaming_cancel_is_clean():
             if t is not asyncio.current_task() and not t.done()
             and t.get_name().startswith("jarvis-")]
     assert ours == []
+
+
+class _FragmentedStreamProvider(BaseLLMProvider):
+    """Fake provider emitting raw tool-call fragments like Ollama/Gemini do.
+
+    script: list of turns; each turn is a list of StreamChunk objects to yield.
+    """
+
+    def __init__(self, script):
+        self._script = script
+        self._turn = 0
+
+    async def generate(self, messages, tools=None, **kwargs):
+        raise AssertionError("streaming tests must use generate_stream")
+
+    async def generate_stream(self, messages, tools=None, **kwargs):
+        chunks = self._script[min(self._turn, len(self._script) - 1)]
+        self._turn += 1
+        for chunk in chunks:
+            yield chunk
+
+    async def health_check(self):
+        return True
+
+    def get_model_info(self):
+        return {"provider": "fragmented-test", "model": "fragmented-test"}
+
+
+def _raw_turn(*fragments, terminal=True):
+    chunks = [StreamChunk(content_delta="", tool_calls_raw=list(fragments))]
+    if terminal:
+        chunks.append(StreamChunk(content_delta="", finish_reason="stop"))
+    return chunks
+
+
+def _text_turn(text):
+    return [StreamChunk(content_delta=text, finish_reason="stop")]
+
+
+@pytest.mark.asyncio
+async def test_fragmented_arguments_reassembled_across_chunks():
+    provider = _FragmentedStreamProvider([
+        _raw_turn(
+            RawToolCallDelta(id="call-1", name="echo", arguments_str='{"message":"hel'),
+            RawToolCallDelta(id="call-1", name="", arguments_str='lo"}'),
+        ),
+        _text_turn("hello back"),
+    ])
+    orch = Orchestrator(llm_provider=provider)
+
+    events = await _collect(orch.stream_message(
+        OrchestratorRequest(message="say hello", device_id="test-device")
+    ))
+    kinds = [e.event_type.value.lower() for e in events]
+    assert "tool_call" in kinds
+    assert "tool_result" in kinds
+    assert kinds[-1] == "done"
+
+    # The fragments were NEVER valid JSON alone — yet the full argument survived.
+    result_ev = next(e for e in events if e.event_type.value == "TOOL_RESULT")
+    assert result_ev.data["success"] is True
+    assert result_ev.data["data_preview"] == {"echo": "hello"}
+
+    call_ev = next(e for e in events if e.event_type.value == "TOOL_CALL")
+    assert call_ev.data["call_id"] == "call-1"
+
+    session_id = events[0].data["session_id"]
+    window = await ConversationManager().get_context_window(session_id)
+    assert [m.role for m in window] == ["user", "assistant", "tool", "assistant"]
+    assert_valid_tool_sequence(window)
+
+
+@pytest.mark.asyncio
+async def test_invalid_arguments_json_aborts_turn_without_executing():
+    provider = _FragmentedStreamProvider([
+        _raw_turn(
+            RawToolCallDelta(id="call-9", name="echo", arguments_str='{"message":'),
+            RawToolCallDelta(id="call-9", name="", arguments_str='oops'),
+        ),
+    ])
+    orch = Orchestrator(llm_provider=provider)
+
+    events = await _collect(orch.stream_message(
+        OrchestratorRequest(message="say hello", device_id="test-device")
+    ))
+    kinds = [e.event_type.value.lower() for e in events]
+    assert "error" in kinds
+    assert kinds[-1] == "done"
+    assert "tool_call" not in kinds
+    assert "tool_result" not in kinds  # the tool was NOT executed
+
+    error_ev = next(e for e in events if e.event_type.value == "ERROR")
+    assert "call-9" in error_ev.data["message"]
+    assert "not executed" in error_ev.data["message"]
+
+    # Nothing partial was persisted: history holds only the user message.
+    session_id = events[0].data["session_id"]
+    history = await ConversationManager().get_history(session_id)
+    assert [m.role for m in history] == ["user"]
+
+
+@pytest.mark.asyncio
+async def test_complete_raw_call_in_single_chunk_still_works():
+    provider = _FragmentedStreamProvider([
+        _raw_turn(RawToolCallDelta(id="call-1", name="echo",
+                                   arguments_str='{"message": "whole"}')),
+        _text_turn("done"),
+    ])
+    orch = Orchestrator(llm_provider=provider)
+
+    events = await _collect(orch.stream_message(
+        OrchestratorRequest(message="say whole", device_id="test-device")
+    ))
+    result_ev = next(e for e in events if e.event_type.value == "TOOL_RESULT")
+    assert result_ev.data["success"] is True
+    assert result_ev.data["data_preview"] == {"echo": "whole"}
+
+
+@pytest.mark.asyncio
+async def test_router_discards_failed_provider_tool_deltas():
+    async def _gen_a(messages, tools=None, **kwargs):
+        yield StreamChunk(content_delta="Hello ")
+        yield StreamChunk(content_delta="", tool_calls_raw=[
+            RawToolCallDelta(id="call-A", name="echo", arguments_str='{"message":"a"}'),
+        ])
+        raise RuntimeError("provider A died mid-stream")
+
+    async def _gen_b(messages, tools=None, **kwargs):
+        yield StreamChunk(content_delta="from B")
+        yield StreamChunk(content_delta="", tool_calls_raw=[
+            RawToolCallDelta(id="call-B", name="echo", arguments_str='{"message":"b"}'),
+        ])
+        yield StreamChunk(content_delta="", finish_reason="stop")
+
+    provider_a = MockLLMProvider()
+    provider_a.generate_stream = _gen_a
+    provider_b = MockLLMProvider()
+    provider_b.generate_stream = _gen_b
+
+    registry = ProviderRegistry()
+    registry.register("a", provider_a, priority=10.0)
+    registry.register("b", provider_b, priority=5.0)
+    router = IntelligenceRouter(registry=registry)
+
+    seen = [chunk async for chunk in router.route_stream(messages=[], tools=None)]
+    text = "".join(c.content_delta for c in seen)
+    # Text kept streaming from both providers...
+    assert text == "Hello from B"
+    # ...but only the surviving provider's tool deltas were flushed.
+    raw_ids = [raw.id for c in seen for raw in (c.tool_calls_raw or [])]
+    assert raw_ids == ["call-B"]
+    parsed_ids = [tc.id for c in seen for tc in (c.tool_calls_deltas or [])]
+    assert parsed_ids == []
 
 
 def _mock_backed_app():

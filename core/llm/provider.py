@@ -14,6 +14,7 @@ from core.contracts.llm import (
     LLMToolDef,
     LLMFunctionCall,
     LLMUsage,
+    RawToolCallDelta,
     StreamChunk,
 )
 from core.config import get_settings
@@ -227,28 +228,28 @@ class OllamaProvider(BaseLLMProvider):
                             content = delta.get("content", "")
                             finish = choice.get("finish_reason")
 
-                            tool_calls_delta = []
+                            # Raw fragments only: argument JSON often arrives split
+                            # across chunks, and parsing a fragment here would
+                            # silently discard it. Parsing happens once the
+                            # turn ends (see _StreamTurnAccumulator).
+                            tool_calls_raw = []
                             for tc in delta.get("tool_calls", []):
                                 func = tc.get("function", {})
-                                args_raw = func.get("arguments", "{}")
-                                try:
-                                    args = json.loads(args_raw) if isinstance(args_raw, str) else args_raw
-                                except json.JSONDecodeError:
-                                    args = {}
-                                tool_calls_delta.append(
-                                    LLMToolCall(
+                                args_raw = func.get("arguments", "")
+                                if not isinstance(args_raw, str):
+                                    args_raw = json.dumps(args_raw)
+                                tool_calls_raw.append(
+                                    RawToolCallDelta(
                                         id=tc.get("id", ""),
                                         type=tc.get("type", "function"),
-                                        function=LLMFunctionCall(
-                                            name=func.get("name", ""),
-                                            arguments=args,
-                                        ),
+                                        name=func.get("name", ""),
+                                        arguments_str=args_raw,
                                     )
                                 )
 
                             yield StreamChunk(
                                 content_delta=content,
-                                tool_calls_deltas=tool_calls_delta,
+                                tool_calls_raw=tool_calls_raw,
                                 finish_reason=finish,
                             )
                         except json.JSONDecodeError:
