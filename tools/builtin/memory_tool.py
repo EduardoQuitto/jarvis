@@ -1,9 +1,9 @@
 """Memory search tool for querying JARVIS memory."""
 
-from typing import Any, Optional, Type
+from typing import Any, Dict, Optional, Type
 from pydantic import BaseModel, Field
 
-from core.contracts.enums import SecurityLevel
+from core.contracts.enums import ParamKind, SecurityLevel
 from core.contracts.tool import BaseTool, ToolResult
 from memory.sqlite_provider import SQLiteMemoryProvider
 
@@ -20,6 +20,8 @@ class SearchMemoryTool(BaseTool):
     description: str = "Search memory for stored information, past conversations, or learned facts."
     security_level: SecurityLevel = SecurityLevel.GREEN
     args_schema: Optional[Type[BaseModel]] = SearchMemoryArgs
+    # The query is bound as a SQL parameter, never interpolated.
+    param_kinds: Dict[str, ParamKind] = {"query": ParamKind.FREE_TEXT}
 
     async def execute(self, **kwargs: Any) -> ToolResult:
         query = kwargs.get("query", "")

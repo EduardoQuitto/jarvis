@@ -1,10 +1,10 @@
 """File operations tool for reading/writing files on the server."""
 
 from pathlib import Path
-from typing import Any, Optional, Type
+from typing import Any, Dict, Optional, Type
 from pydantic import BaseModel, Field
 
-from core.contracts.enums import SecurityLevel
+from core.contracts.enums import ParamKind, SecurityLevel
 from core.contracts.tool import BaseTool, ToolResult
 from security.allowlist import AllowlistValidator, SecurityValidationError
 
@@ -29,13 +29,17 @@ class ReadFileTool(BaseTool):
     description: str = "Read the contents of a file from the filesystem."
     security_level: SecurityLevel = SecurityLevel.YELLOW
     args_schema: Optional[Type[BaseModel]] = ReadFileArgs
+    param_kinds: Dict[str, ParamKind] = {"file_path": ParamKind.PATH}
 
     async def execute(self, **kwargs: Any) -> ToolResult:
         file_path = kwargs.get("file_path", "")
         validator = AllowlistValidator()
 
         try:
-            resolved = validator.validate_file_path(file_path, must_exist=False)
+            # Same PATH semantics as PolicyEngine: sandbox containment,
+            # traversal and symlink safety, WITHOUT shell sanitization
+            # (names like "Program Files (x86)" must work).
+            resolved = validator.validate_sandbox_path(file_path)
         except SecurityValidationError as e:
             return ToolResult.fail(
                 error=f"Access denied: {e}",
@@ -61,6 +65,8 @@ class WriteFileTool(BaseTool):
     description: str = "Write content to a file on the filesystem."
     security_level: SecurityLevel = SecurityLevel.YELLOW
     args_schema: Optional[Type[BaseModel]] = WriteFileArgs
+    # Content is written verbatim to disk, never to a shell.
+    param_kinds: Dict[str, ParamKind] = {"file_path": ParamKind.PATH, "content": ParamKind.FREE_TEXT}
 
     async def execute(self, **kwargs: Any) -> ToolResult:
         file_path = kwargs.get("file_path", "")
@@ -68,7 +74,8 @@ class WriteFileTool(BaseTool):
         validator = AllowlistValidator()
 
         try:
-            resolved = validator.validate_file_path(file_path, must_exist=False)
+            # Same PATH semantics as PolicyEngine (see ReadFileTool).
+            resolved = validator.validate_sandbox_path(file_path)
         except SecurityValidationError as e:
             return ToolResult.fail(
                 error=f"Access denied: {e}",
@@ -93,13 +100,15 @@ class ListDirTool(BaseTool):
     description: str = "List files and subdirectories in a directory."
     security_level: SecurityLevel = SecurityLevel.GREEN
     args_schema: Optional[Type[BaseModel]] = ListDirArgs
+    param_kinds: Dict[str, ParamKind] = {"directory": ParamKind.PATH}
 
     async def execute(self, **kwargs: Any) -> ToolResult:
         directory = kwargs.get("directory", ".")
         validator = AllowlistValidator()
 
         try:
-            resolved = validator.validate_file_path(directory, must_exist=False)
+            # Same PATH semantics as PolicyEngine (see ReadFileTool).
+            resolved = validator.validate_sandbox_path(directory)
         except SecurityValidationError as e:
             return ToolResult.fail(
                 error=f"Access denied: {e}",

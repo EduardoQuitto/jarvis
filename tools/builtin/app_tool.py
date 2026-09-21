@@ -2,11 +2,11 @@
 
 import subprocess
 import time
-from typing import Any, Optional, Type
+from typing import Any, Dict, Optional, Type
 from pydantic import BaseModel, Field
 import psutil
 
-from core.contracts.enums import SecurityLevel
+from core.contracts.enums import ParamKind, SecurityLevel
 from core.contracts.tool import BaseTool, ToolResult
 from security.allowlist import AllowlistValidator, SecurityValidationError
 
@@ -22,6 +22,8 @@ class LaunchApplicationTool(BaseTool):
     description: str = "Launch an approved application defined in the security allowlist."
     security_level: SecurityLevel = SecurityLevel.YELLOW
     args_schema: Optional[Type[BaseModel]] = LaunchAppArgs
+    # Alias resolved via allowlist + subprocess list (shell=False) at execution.
+    param_kinds: Dict[str, ParamKind] = {"app_name": ParamKind.IDENT}
 
     def __init__(self, validator: Optional[AllowlistValidator] = None):
         self.validator = validator or AllowlistValidator()
@@ -57,6 +59,7 @@ class CloseApplicationTool(BaseTool):
     description: str = "Close running instances of an approved application."
     security_level: SecurityLevel = SecurityLevel.YELLOW
     args_schema: Optional[Type[BaseModel]] = CloseAppArgs
+    param_kinds: Dict[str, ParamKind] = {"app_name": ParamKind.IDENT}
 
     def __init__(self, validator: Optional[AllowlistValidator] = None):
         self.validator = validator or AllowlistValidator()

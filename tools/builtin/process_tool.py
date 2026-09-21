@@ -1,11 +1,11 @@
 """Process query tools."""
 
 import time
-from typing import Any, List, Optional, Type
+from typing import Any, Dict, List, Optional, Type
 from pydantic import BaseModel, Field
 import psutil
 
-from core.contracts.enums import SecurityLevel
+from core.contracts.enums import ParamKind, SecurityLevel
 from core.contracts.telemetry import ProcessInfo
 from core.contracts.tool import BaseTool, ToolResult
 
@@ -22,6 +22,7 @@ class ListProcessesTool(BaseTool):
     description: str = "List running system processes with resource consumption."
     security_level: SecurityLevel = SecurityLevel.GREEN
     args_schema: Optional[Type[BaseModel]] = ListProcessesArgs
+    param_kinds: Dict[str, ParamKind] = {"sort_by": ParamKind.IDENT}
 
     async def execute(self, **kwargs: Any) -> ToolResult:
         start = time.perf_counter()

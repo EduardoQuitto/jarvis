@@ -4,7 +4,7 @@ import time
 from typing import Any, Callable, Dict, Optional, Type
 from pydantic import BaseModel, ValidationError
 
-from core.contracts.enums import SecurityLevel, ToolVisibility
+from core.contracts.enums import ParamKind, SecurityLevel, ToolVisibility
 from core.contracts.tool import BaseTool, ToolMetadata, ToolResult
 
 
@@ -20,6 +20,7 @@ class FunctionalTool(BaseTool):
         visibility: ToolVisibility = ToolVisibility.LOCAL_ONLY,
         args_schema: Optional[Type[BaseModel]] = None,
         timeout_seconds: float = 30.0,
+        param_kinds: Optional[Dict[str, ParamKind]] = None,
     ):
         self.name = name
         self.description = description
@@ -28,6 +29,7 @@ class FunctionalTool(BaseTool):
         self.visibility = visibility
         self.args_schema = args_schema
         self.timeout_seconds = timeout_seconds
+        self.param_kinds = param_kinds or {}
 
     async def execute(self, **kwargs: Any) -> ToolResult:
         start_time = time.perf_counter()

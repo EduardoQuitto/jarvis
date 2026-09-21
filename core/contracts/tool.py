@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional, Type
 from pydantic import BaseModel, Field
 
-from core.contracts.enums import SecurityLevel, ToolVisibility
+from core.contracts.enums import ParamKind, SecurityLevel, ToolVisibility
 
 
 class ToolResult(BaseModel):
@@ -45,6 +45,7 @@ class ToolMetadata(BaseModel):
     security_level: SecurityLevel = Field(default=SecurityLevel.GREEN, description="Security level classification")
     visibility: ToolVisibility = Field(default=ToolVisibility.LOCAL_ONLY, description="Provider visibility: LOCAL_ONLY or SHARED")
     parameters_schema: Dict[str, Any] = Field(default_factory=dict, description="JSON Schema of acceptable parameters")
+    param_kinds: Dict[str, str] = Field(default_factory=dict, description="Parameter name to ParamKind value, driving PolicyEngine validation")
     timeout_seconds: float = Field(default=30.0, description="Maximum execution timeout in seconds")
 
 
@@ -57,6 +58,9 @@ class BaseTool(ABC):
     visibility: ToolVisibility = ToolVisibility.LOCAL_ONLY
     args_schema: Optional[Type[BaseModel]] = None
     timeout_seconds: float = 30.0
+    # Declared validation kind per string parameter. Undeclared string
+    # parameters default to SHELL_ARG (strict), preserving protection.
+    param_kinds: Dict[str, ParamKind] = {}
 
     @property
     def metadata(self) -> ToolMetadata:
@@ -68,6 +72,7 @@ class BaseTool(ABC):
             security_level=self.security_level,
             visibility=self.visibility,
             parameters_schema=schema,
+            param_kinds={k: v.value for k, v in self.param_kinds.items()},
             timeout_seconds=self.timeout_seconds,
         )
 

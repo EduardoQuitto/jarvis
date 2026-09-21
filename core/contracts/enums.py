@@ -39,6 +39,26 @@ class ToolVisibility(str, Enum):
     SHARED = "SHARED"
 
 
+class ParamKind(str, Enum):
+    """Declares how a single tool parameter must be validated by PolicyEngine.
+
+    FREE_TEXT  — free-form text (echo, queries, file content). No shell
+                 sanitization: the value never reaches a shell.
+    PATH       — filesystem path. Sandbox containment only (no shell rules,
+                 so names like "Program Files (x86)" keep working).
+    URL        — URL syntax (http/https + host). Full SSRF checks stay in
+                 net_guard at the fetching tool, not here.
+    SHELL_ARG  — may flow toward process execution. Strict shell-metachar
+                 sanitization. Default for undeclared string parameters.
+    IDENT      — restrictive identifier (aliases, sort keys, tool names).
+    """
+    FREE_TEXT = "FREE_TEXT"
+    PATH = "PATH"
+    URL = "URL"
+    SHELL_ARG = "SHELL_ARG"
+    IDENT = "IDENT"
+
+
 class GoalStatus(str, Enum):
     """Lifecycle status for goals in the Goal Engine."""
     PENDING = "pending"
