@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Phase 12 — Central Server & Central State Authority:**
+  - `CentralStateClient` over `RemoteNodeClient` (conversations, memory, confirmations; explicit `CentralStateError`, nothing invented); `JARVIS_CENTRAL_STATE_ENABLED` (default off, local mode preserved) and `JARVIS_CENTRAL_STATE_REQUIRED` (explicit failure, no silent local fallback).
+  - Central conversations API (`POST/GET /api/conversations[/{id}[/messages]]`) on the existing SQLite schema; `ConversationManager` accepts a central backend with identical tool-call sequence semantics.
+  - Central memory: `CentralMemoryProvider` (same `BaseMemoryProvider` interface + `search_memory`); `search_memory` tool uses the runtime backend. No vectors/embeddings.
+  - Central confirmations: `confirmations` table + `/api/confirmations/*` (create/resolve/atomic single-use consume/pending/cleanup, `require_node_auth`); single-use, session binding, expiry, approved/denied and `remaining_calls` preserved.
+  - SERVER gateway: `node_role=SERVER` forwards `POST /api/chat/send|/stream` to an eligible compute CORE (type CORE + LLM capability + ONLINE/READY + ip/port via `DeviceRegistry`); explicit HTTP 503 without a CORE, never faked answers; `/api/devices/` now exposes ip/port/capabilities.
+  - CORE compute endpoints `POST /internal/chat/send|/stream` (node auth required, refused on SERVER role) reusing exactly the Orchestrator; byte-identical SSE proxy with clean disconnect handling.
 - **Phase 11 — real-time streaming (SSE):**
   - `Orchestrator.stream_message()` emitting `OrchestratorStreamEvent` (`START`, `THINKING`, `TEXT_DELTA`, `TOOL_CALL`, `TOOL_RESULT`, `WAITING_CONFIRMATION`, `ERROR`, `DONE`).
   - `POST /api/chat/stream` serving `text/event-stream` with the same auth, policy gates, persistence and confirmation flow as `/api/chat/send` (unchanged).

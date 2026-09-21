@@ -110,10 +110,21 @@
 
 ---
 
+### Fase 12: Central Server & Central State Authority (Em operação)
+
+SERVER = control plane / source of truth. CORE = compute plane (Orchestrator, LLM, tools locais).
+
+- [x] `CentralStateClient` (`core/network/central_state_client.py`) sobre `RemoteNodeClient`: conversas, memória e confirmações via HTTP, erros explícitos (`CentralStateError`), nada inventado. Flags `JARVIS_CENTRAL_STATE_ENABLED` (default off, modo local preservado) e `JARVIS_CENTRAL_STATE_REQUIRED` (falha explícita, sem fallback silencioso).
+- [x] Conversas centrais: `POST/GET /api/conversations/`, `GET /{id}`, `GET/POST /{id}/messages` sobre o schema SQLite existente; `ConversationManager` aceita backend central (sequência `user -> assistant(tool_calls) -> tool -> assistant` preservada).
+- [x] Memória central: `CentralMemoryProvider` (mesma interface `BaseMemoryProvider` + `search_memory`); `search_memory` tool usa o backend do runtime. Sem vetores/embeddings.
+- [x] Confirmações centrais: tabela `confirmations` + `POST/GET /api/confirmations/`, `/pending`, `/{id}`, `/{id}/resolve`, `/{id}/consume` (atômico, single-use), `/cleanup`; single-use, session binding, expiry, approved/denied e `remaining_calls` preservados.
+- [x] Gateway: em `node_role=SERVER`, `POST /api/chat/send|/stream` encaminha a um CORE elegível (type CORE + capability LLM + ONLINE/READY + ip/porta); HTTP 503 explícito sem CORE; sem mock, sem resposta inventada. Demais roles respondem localmente como antes.
+- [x] Compute interno: `POST /internal/chat/send|/stream` (auth obrigatória, recusado em role SERVER) reutilizando exatamente o Orchestrator; proxy SSE byte a byte, sem órfãs.
+- [x] Descoberta via `DeviceRegistry` existente (`/api/devices/` agora expõe ip/porta/capabilities/status); V1 seleciona o primeiro elegível, sem fila/scheduler/workers.
+
 ### Próximas Fases (Futuras)
 
 * **Fase 11: Streaming de Respostas** (Concluída) — `Orchestrator.stream_message()` emite eventos estruturados (`start`, `thinking`, `text_delta`, `tool_call`, `tool_result`, `waiting_confirmation`, `error`, `done`) via `POST /api/chat/stream` (SSE `text/event-stream`); mesmos gates de PolicyEngine/ToolExecutor/ConfirmationManager e mesma persistência do `/api/chat/send`; tool calls continuam buffered internamente; disconnect do cliente cancela sem órfãs.
-* **Fase 12: Persistência de Conversas** (Garantir que conversas sobrevivam a restarts do servidor — já parcialmente implementado via SQLite).
 * **Fase 13: Integração Home Assistant** (Scheduler, automações e Wake-on-LAN no JARVIS Server).
 * **Fase 14: Pipeline de Voz Local** (Wake Word -> VAD -> Whisper -> TTS Piper).
 * **Fase 15: Android & Tablet Dashboard** (Home Assistant Companion + painel HTML ultraleve).

@@ -80,6 +80,21 @@ def _isolate_test_environment(tmp_path, monkeypatch):
         _mem_mod._memory = None
     except (ImportError, AttributeError):
         pass
+    try:
+        import server.routers.conversations as _conv_mod
+        _conv_mod._memory = None
+    except (ImportError, AttributeError):
+        pass
+    try:
+        import server.routers.confirmations as _conf_mod
+        _conf_mod._memory = None
+    except (ImportError, AttributeError):
+        pass
+    try:
+        import server.compute as _compute_mod
+        _compute_mod.reset_compute_registry()
+    except (ImportError, AttributeError):
+        pass
 
     yield
 

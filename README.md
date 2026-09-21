@@ -13,7 +13,7 @@ It is **not** a cloud chatbot. It is a local intelligence layer that runs on you
 
 ## Current Status
 
-**Phase 10 complete** (Security & Execution Boundary Hardening), operational CORE ↔ SERVER bridge, and **Fase 11 complete** (real-time SSE streaming via `POST /api/chat/stream`). 377 tests collected (375 passing, 0 failures).
+**Phase 10 complete** (Security & Execution Boundary Hardening), operational CORE ↔ SERVER bridge, **Fase 11 complete** (real-time SSE streaming via `POST /api/chat/stream`) and **Fase 12 complete** (Central Server & Central State Authority: SERVER = gateway + source of truth, CORE = compute plane).
 
 ### Implemented
 
@@ -24,7 +24,8 @@ It is **not** a cloud chatbot. It is a local intelligence layer that runs on you
 - **Memory**: SQLite async provider (key-value + audit trail)
 - **Planner**: Deterministic plan builder and executor with dependency management
 - **Intelligence Router**: Multi-provider fallback with circuit breaker; chain Ollama (local, primary) → Google Gemini (cloud) → mock, retry with backoff on transient cloud errors
-- **REST API**: FastAPI server with /health, /telemetry, /tools, /chat, /chat/stream (SSE, Fase 11), /mcp, /api/devices, /api/tasks endpoints
+- **REST API**: FastAPI gateway with /health, /telemetry, /tools, /chat, /chat/stream (SSE), /internal/chat (compute-only), /mcp, /api/devices, /api/tasks, /api/memory, /api/conversations, /api/confirmations endpoints
+- **Central state**: SERVER SQLite is the source of truth (conversations, memory, confirmations, tasks, devices); CORE runs the Orchestrator/LLM and consumes state over HTTP
 - **Orchestrator**: LLM-driven agentic loop with tool calling and confirmation flow (approved YELLOW/RED tools execute; failures reported honestly)
 - **Goal Engine**: High-level objective lifecycle (create/start/complete/fail/cancel) with replanning
 - **Agent System**: Specialized agent execution with immutable permissions, factory, registry, security validation

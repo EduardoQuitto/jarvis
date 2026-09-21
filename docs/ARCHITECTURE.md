@@ -82,7 +82,8 @@ graph TD
 
 | Module | Responsibility | OS-Agnostic? |
 |--------|---------------|--------------|
-| `core/network` | CORE → SERVER bridge: RemoteNodeClient (HTTP transport only), NodePresenceManager (auto-registration + heartbeat) | Yes (100%) |
+| `core/network` | CORE → SERVER bridge: RemoteNodeClient (HTTP transport only), NodePresenceManager (auto-registration + heartbeat), CentralStateClient (central conversations/memory/confirmations) | Yes (100%) |
+| `server/compute.py` | SERVER gateway: compute discovery via DeviceRegistry, chat forwarding to CORE (503 without CORE) | Yes (100%) |
 | `core/contracts` | Interfaces, DTOs, enums | Yes (100%) |
 | `core/config` | Centralized settings (Pydantic) | Yes (100%) |
 | `core/events` | System-wide event bus | Yes (100%) |
@@ -167,6 +168,30 @@ All tool execution flows through a single authorization boundary:
 - Seleção/fallback de provider continuam em `route_stream()`/`generate_stream()` (sem duplicação); tool calls passam pelos mesmos `PolicyEngine`/`ToolExecutor`/`ConfirmationManager` e pela mesma persistência (sequência OpenAI-compatible preservada).
 - Tool calls em stream são buffered e mesclados por id — nunca tratados como parciais; texto flui delta a delta sem acumular a resposta em memória.
 - `POST /api/chat/stream` entrega `text/event-stream` (`event:` + `data: JSON` + `\n\n`) com a mesma autenticação do `/send`, que permanece inalterado.
+
+### Central Server & Central State Authority (Fase 12)
+
+SERVER = control plane / source of truth (gateway FastAPI + SQLite central).
+CORE = compute plane (Orchestrator, Ollama/Qwen, Gemini fallback, local tools,
+Windows Agent) e consome estado central via HTTP. O SQLite local do Core só é
+fonte de verdade com central state desabilitado (padrão em testes/dev).
+
+- **Conversa central**: `POST/GET /api/conversations[/{id}[/messages]]` sobre o
+  schema existente; `ConversationManager` aceita backend central
+  (`JARVIS_CENTRAL_STATE_ENABLED`, `JARVIS_CENTRAL_STATE_REQUIRED` para falhar
+  explicitamente em vez de cair para o SQLite local).
+- **Memória central**: `CentralMemoryProvider` (mesma interface
+  `BaseMemoryProvider` + `search_memory`); `search_memory` usa o backend do
+  runtime. SQLite continua sendo a primeira camada; sem vetores.
+- **Confirmações centrais**: tabela `confirmations` + `/api/confirmations/*`
+  (create/resolve/consume atômico single-use/pending/cleanup); single-use,
+  session binding, expiry, approved/denied e `remaining_calls` preservados.
+- **Gateway**: com `node_role=SERVER`, `POST /api/chat/send|/stream` encaminha
+  a um CORE elegível (type CORE + capability LLM + ONLINE/READY + ip/porta via
+  `DeviceRegistry`); sem CORE → HTTP 503 explícito, nunca resposta inventada.
+- **Compute interno**: `POST /internal/chat/send|/stream` (auth obrigatória,
+  recusado em role SERVER) reutiliza exatamente o Orchestrator; proxy SSE
+  byte a byte, sem tarefas órfãs. LLM pesado nunca roda no SERVER.
 
 ### Other Security Components
 - **ConfirmationManager** issues single-use, session-bound tokens for YELLOW/RED actions with timestamps, expiry, and reuse blocking.

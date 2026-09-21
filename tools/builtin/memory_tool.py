@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 
 from core.contracts.enums import ParamKind, SecurityLevel
 from core.contracts.tool import BaseTool, ToolResult
-from memory.sqlite_provider import SQLiteMemoryProvider
+from memory import get_memory_provider
 
 
 class SearchMemoryArgs(BaseModel):
@@ -28,7 +28,7 @@ class SearchMemoryTool(BaseTool):
         limit = kwargs.get("limit", 10)
 
         try:
-            memory = SQLiteMemoryProvider()
+            memory = get_memory_provider()
             results = await memory.search_memory(query=query, limit=limit)
             return ToolResult.ok(
                 data={"results": results, "count": len(results)},
