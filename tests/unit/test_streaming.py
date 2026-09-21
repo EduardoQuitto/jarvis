@@ -330,8 +330,73 @@ async def test_complete_raw_call_in_single_chunk_still_works():
     assert result_ev.data["data_preview"] == {"echo": "whole"}
 
 
+class _ScriptedStreamProvider(BaseLLMProvider):
+    """Fake streaming provider driven by a per-turn script.
+
+    turns: list of turns; each turn is a list of items where each item is
+    ("text", str), ("raw", RawToolCallDelta), ("call", LLMToolCall) or
+    ("raise", exc). Turns past the last one replay the final turn.
+    Records every generate_stream entry in attempts.
+    """
+
+    def __init__(self, turns, name="scripted"):
+        self._turns = turns
+        self._name = name
+        self.attempts = 0
+        self._turn = 0
+
+    async def generate(self, messages, tools=None, **kwargs):
+        raise AssertionError("streaming fallback tests must use generate_stream")
+
+    async def generate_stream(self, messages, tools=None, **kwargs):
+        self.attempts += 1
+        turn = self._turns[min(self._turn, len(self._turns) - 1)]
+        self._turn += 1
+        for item in turn:
+            kind = item[0]
+            if kind == "text":
+                yield StreamChunk(content_delta=item[1])
+            elif kind == "raw":
+                yield StreamChunk(content_delta="", tool_calls_raw=[item[1]])
+            elif kind == "call":
+                yield StreamChunk(content_delta="", tool_calls_deltas=[item[1]])
+            elif kind == "raise":
+                raise item[1]
+        yield StreamChunk(content_delta="", finish_reason="stop")
+
+    async def health_check(self):
+        return True
+
+    def get_model_info(self):
+        return {"provider": self._name, "model": self._name}
+
+
+def _router_with(*providers):
+    registry = ProviderRegistry()
+    for priority, provider in providers:
+        registry.register(provider.get_model_info()["provider"], provider, priority=priority)
+    return IntelligenceRouter(registry=registry)
+
+
+@pytest.mark.asyncio
+async def test_router_falls_back_when_provider_fails_before_content():
+    """A. Failure before the first chunk -> next provider is used."""
+    provider_a = _ScriptedStreamProvider([[("raise", RuntimeError("A is down"))]], name="a")
+    provider_b = _ScriptedStreamProvider([[("text", "from B")]], name="b")
+    router = _router_with((10.0, provider_a), (5.0, provider_b))
+
+    seen = [chunk async for chunk in router.route_stream(messages=[], tools=None)]
+    assert "".join(c.content_delta for c in seen) == "from B"
+    assert provider_a.attempts == 1
+    assert provider_b.attempts == 1
+
+
 @pytest.mark.asyncio
 async def test_router_discards_failed_provider_tool_deltas():
+    # NOTE: updated for the safe-fallback contract. The old expectation
+    # (silently continue on B after A died mid-stream, mixing "Hello " with
+    # B's full answer) was exactly the incoherence being fixed: text from two
+    # different generations must never be stitched together.
     async def _gen_a(messages, tools=None, **kwargs):
         yield StreamChunk(content_delta="Hello ")
         yield StreamChunk(content_delta="", tool_calls_raw=[
@@ -339,32 +404,105 @@ async def test_router_discards_failed_provider_tool_deltas():
         ])
         raise RuntimeError("provider A died mid-stream")
 
-    async def _gen_b(messages, tools=None, **kwargs):
-        yield StreamChunk(content_delta="from B")
-        yield StreamChunk(content_delta="", tool_calls_raw=[
-            RawToolCallDelta(id="call-B", name="echo", arguments_str='{"message":"b"}'),
-        ])
-        yield StreamChunk(content_delta="", finish_reason="stop")
-
     provider_a = MockLLMProvider()
     provider_a.generate_stream = _gen_a
-    provider_b = MockLLMProvider()
-    provider_b.generate_stream = _gen_b
+    provider_b = _ScriptedStreamProvider([("text", "SHOULD NOT APPEAR")], name="b")
 
     registry = ProviderRegistry()
     registry.register("a", provider_a, priority=10.0)
     registry.register("b", provider_b, priority=5.0)
     router = IntelligenceRouter(registry=registry)
 
-    seen = [chunk async for chunk in router.route_stream(messages=[], tools=None)]
-    text = "".join(c.content_delta for c in seen)
-    # Text kept streaming from both providers...
-    assert text == "Hello from B"
-    # ...but only the surviving provider's tool deltas were flushed.
-    raw_ids = [raw.id for c in seen for raw in (c.tool_calls_raw or [])]
-    assert raw_ids == ["call-B"]
-    parsed_ids = [tc.id for c in seen for tc in (c.tool_calls_deltas or [])]
-    assert parsed_ids == []
+    # Partial text was already forwarded, then the failure propagates and B
+    # is never attempted (no mixed generations, no flushed tool deltas).
+    seen_text = []
+    with pytest.raises(RuntimeError, match="provider A died mid-stream"):
+        async for chunk in router.route_stream(messages=[], tools=None):
+            seen_text.append(chunk.content_delta)
+    assert "".join(seen_text) == "Hello "
+    assert provider_b.attempts == 0
+
+
+@pytest.mark.asyncio
+async def test_stream_failure_after_text_keeps_partial_and_errors():
+    """B/C. Provider dies after text (or raw fragments): no second provider,
+    partial text kept, ERROR + DONE, nothing executed or persisted."""
+    provider_a = _ScriptedStreamProvider([[
+        ("text", "Hello "),
+        ("raw", RawToolCallDelta(id="call-A", name="echo", arguments_str='{"message":"a"}')),
+        ("raise", RuntimeError("A died mid-stream")),
+    ]], name="a")
+    provider_b = _ScriptedStreamProvider([[("text", "NEVER")]], name="b")
+    orch = Orchestrator(router=_router_with((10.0, provider_a), (5.0, provider_b)))
+
+    events = await _collect(orch.stream_message(
+        OrchestratorRequest(message="hi", device_id="test-device")
+    ))
+    kinds = [e.event_type.value.lower() for e in events]
+    assert "error" in kinds
+    assert kinds[-1] == "done"
+    assert "tool_call" not in kinds
+    assert "tool_result" not in kinds  # A's fragments discarded, never executed
+
+    text = "".join(e.data["text"] for e in events if e.event_type.value == "TEXT_DELTA")
+    assert text == "Hello "
+    assert "NEVER" not in text  # B never contaminated the answer
+    assert provider_b.attempts == 0
+
+    # Nothing partial persisted: history holds only the user message.
+    session_id = events[0].data["session_id"]
+    history = await ConversationManager().get_history(session_id)
+    assert [m.role for m in history] == ["user"]
+
+
+@pytest.mark.asyncio
+async def test_stream_prefailure_fallback_executes_next_provider_tool():
+    """D. A fails before any content -> B is used, B's tool call executes."""
+    provider_a = _ScriptedStreamProvider([[("raise", RuntimeError("A is down"))]], name="a")
+    provider_b = _ScriptedStreamProvider([
+        [("raw", RawToolCallDelta(id="call-B", name="echo", arguments_str='{"message":"b"}'))],
+        [("text", "done b")],
+    ], name="b")
+    orch = Orchestrator(router=_router_with((10.0, provider_a), (9.0, provider_b)))
+
+    events = await _collect(orch.stream_message(
+        OrchestratorRequest(message="echo b", device_id="test-device")
+    ))
+    kinds = [e.event_type.value.lower() for e in events]
+    assert "tool_call" in kinds
+    assert "tool_result" in kinds
+    assert kinds[-1] == "done"
+    result_ev = next(e for e in events if e.event_type.value == "TOOL_RESULT")
+    assert result_ev.data["success"] is True
+    assert result_ev.data["data_preview"] == {"echo": "b"}
+    # Only B's call exists anywhere in the turn.
+    assert all(e.data.get("call_id") != "call-A"
+               for e in events if e.event_type.value in ("TOOL_CALL", "TOOL_RESULT"))
+
+    session_id = events[0].data["session_id"]
+    window = await ConversationManager().get_context_window(session_id)
+    assert_valid_tool_sequence(window)
+
+
+@pytest.mark.asyncio
+async def test_stream_failure_never_mixes_two_generations():
+    """E. Text from A + full answer from B must never be stitched together."""
+    provider_a = _ScriptedStreamProvider([[
+        ("text", "Hello "),
+        ("raise", RuntimeError("A died")),
+    ]], name="a")
+    provider_b = _ScriptedStreamProvider([[("text", "FULL ANSWER FROM B")]], name="b")
+    orch = Orchestrator(router=_router_with((10.0, provider_a), (5.0, provider_b)))
+
+    events = await _collect(orch.stream_message(
+        OrchestratorRequest(message="hi", device_id="test-device")
+    ))
+    text = "".join(e.data["text"] for e in events if e.event_type.value == "TEXT_DELTA")
+    assert text == "Hello "
+    assert "FULL ANSWER FROM B" not in text
+    assert provider_b.attempts == 0
+    kinds = [e.event_type.value.lower() for e in events]
+    assert "error" in kinds and kinds[-1] == "done"
 
 
 def _mock_backed_app():

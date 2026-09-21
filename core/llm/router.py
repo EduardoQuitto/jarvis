@@ -212,6 +212,10 @@ class IntelligenceRouter:
             return
 
         for entry in candidates:
+            # Anything already forwarded to the client (text or a flushed
+            # tool part) forbids trying the next provider: a second
+            # generation would mix two different answers incoherently.
+            emitted_anything = False
             try:
                 buffered_raw = []
                 buffered_calls = []
@@ -223,7 +227,10 @@ class IntelligenceRouter:
                     max_tokens=max_tokens,
                 ):
                     if chunk.content_delta:
+                        emitted_anything = True
                         yield StreamChunk(content_delta=chunk.content_delta)
+                    if chunk.tool_calls_raw or chunk.tool_calls_deltas:
+                        emitted_anything = True
                     buffered_raw.extend(chunk.tool_calls_raw or [])
                     buffered_calls.extend(chunk.tool_calls_deltas or [])
                     if chunk.finish_reason:
@@ -242,8 +249,19 @@ class IntelligenceRouter:
                 self._circuit_breaker.record_success(entry.name)
                 return
             except Exception as e:
-                logger.warning("Streaming failed on %s: %s", entry.name, str(e))
+                # The failed provider's buffered tool part is discarded here
+                # (never flushed): tool calls from different providers are
+                # never mixed.
                 self._circuit_breaker.record_failure(entry.name)
+                if emitted_anything:
+                    logger.warning(
+                        "Streaming failed on %s after content was emitted; "
+                        "not trying another provider to avoid mixing answers: %s",
+                        entry.name, str(e),
+                    )
+                    raise
+                logger.warning("Streaming failed on %s before any content, trying next: %s",
+                               entry.name, str(e))
                 continue
 
         yield StreamChunk(content_delta="", finish_reason="stop")
