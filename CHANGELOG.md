@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Central confirmations: `confirmations` table + `/api/confirmations/*` (create/resolve/atomic single-use consume/pending/cleanup, `require_node_auth`); single-use, session binding, expiry, approved/denied and `remaining_calls` preserved.
   - SERVER gateway: `node_role=SERVER` forwards `POST /api/chat/send|/stream` to an eligible compute CORE (type CORE + LLM capability + ONLINE/READY + ip/port via `DeviceRegistry`); explicit HTTP 503 without a CORE, never faked answers; `/api/devices/` now exposes ip/port/capabilities.
   - CORE compute endpoints `POST /internal/chat/send|/stream` (node auth required, refused on SERVER role) reusing exactly the Orchestrator; byte-identical SSE proxy with clean disconnect handling.
+  - Gemini via SERVER relay (`POST /api/llm/chat/completions` + `GET /api/llm/models`, streaming included, `require_node_auth`, explicit 503 without a SERVER-side key): the CORE cloud slot points at the relay, so the CORE never receives or stores the Gemini key; key never appears in responses, logs or errors.
+  - `search_memory` falls back to local SQLite with a warning when central memory is unreachable in non-required mode, and fails explicitly (`ToolResult.fail`) when required.
+  - Manual deploy checklist in `docs/DEPLOYMENT.md` (SERVER vs CORE `.env`, verification scripts); external access explicitly deferred to a future VPN phase, never public internet.
 - **Phase 11 — real-time streaming (SSE):**
   - `Orchestrator.stream_message()` emitting `OrchestratorStreamEvent` (`START`, `THINKING`, `TEXT_DELTA`, `TOOL_CALL`, `TOOL_RESULT`, `WAITING_CONFIRMATION`, `ERROR`, `DONE`).
   - `POST /api/chat/stream` serving `text/event-stream` with the same auth, policy gates, persistence and confirmation flow as `/api/chat/send` (unchanged).

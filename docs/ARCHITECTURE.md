@@ -192,6 +192,15 @@ fonte de verdade com central state desabilitado (padrão em testes/dev).
 - **Compute interno**: `POST /internal/chat/send|/stream` (auth obrigatória,
   recusado em role SERVER) reutiliza exatamente o Orchestrator; proxy SSE
   byte a byte, sem tarefas órfãs. LLM pesado nunca roda no SERVER.
+- **Gemini via SERVER**: a chave Gemini existe somente no `.env` do SERVER.
+  `POST /api/llm/chat/completions` (+ `GET /api/llm/models`, streaming
+  incluído) repassa ao AI Studio com a chave do SERVER; o CORE aponta seu
+  slot cloud para esse relay autenticando com a node key compartilhada.
+  O CORE nunca recebe nem armazena a chave Gemini.
+- **Offline e futuro remoto**: SERVER fora do ar → CORE segue local
+  (Ollama + tools); central state em modo required falha explicitamente.
+  Acesso externo futuro passa por rede privada/VPN (fase futura) → SERVER
+  → CORE; nada é exposto à internet pública.
 
 ### Other Security Components
 - **ConfirmationManager** issues single-use, session-bound tokens for YELLOW/RED actions with timestamps, expiry, and reuse blocking.

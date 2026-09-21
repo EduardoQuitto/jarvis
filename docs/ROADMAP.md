@@ -119,7 +119,10 @@ SERVER = control plane / source of truth. CORE = compute plane (Orchestrator, LL
 - [x] Memória central: `CentralMemoryProvider` (mesma interface `BaseMemoryProvider` + `search_memory`); `search_memory` tool usa o backend do runtime. Sem vetores/embeddings.
 - [x] Confirmações centrais: tabela `confirmations` + `POST/GET /api/confirmations/`, `/pending`, `/{id}`, `/{id}/resolve`, `/{id}/consume` (atômico, single-use), `/cleanup`; single-use, session binding, expiry, approved/denied e `remaining_calls` preservados.
 - [x] Gateway: em `node_role=SERVER`, `POST /api/chat/send|/stream` encaminha a um CORE elegível (type CORE + capability LLM + ONLINE/READY + ip/porta); HTTP 503 explícito sem CORE; sem mock, sem resposta inventada. Demais roles respondem localmente como antes.
-- [x] Compute interno: `POST /internal/chat/send|/stream` (auth obrigatória, recusado em role SERVER) reutilizando exatamente o Orchestrator; proxy SSE byte a byte, sem órfãs.
+- [x] Compute interno: `POST /internal/chat/send|/stream` (auth obrigatória, recusado em role SERVER) reutilizando
+  exatamente o Orchestrator; proxy SSE byte a byte, sem órfãs.
+- [x] Gemini via SERVER: chave somente no SERVER; relay `POST /api/llm/chat/completions` (+ `/models`, streaming); CORE acessa via relay sem possuir a chave; `search_memory` com fallback local em modo não-required e falha explícita em modo required.
+- [ ] Acesso externo futuro via rede privada/VPN (não implementado; arquitetura já separa gateway SERVER de compute CORE).
 - [x] Descoberta via `DeviceRegistry` existente (`/api/devices/` agora expõe ip/porta/capabilities/status); V1 seleciona o primeiro elegível, sem fila/scheduler/workers.
 
 ### Próximas Fases (Futuras)

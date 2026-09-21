@@ -17,6 +17,7 @@ from server.routers.memory import router as memory_router
 from server.routers.conversations import router as conversations_router
 from server.routers.confirmations import router as confirmations_router
 from server.routers.internal import router as internal_router
+from server.routers.llm import router as llm_router
 from server.routers.mcp import router as mcp_router
 
 
@@ -95,6 +96,7 @@ def create_app() -> FastAPI:
     app.include_router(conversations_router)
     app.include_router(confirmations_router)
     app.include_router(internal_router)
+    app.include_router(llm_router)
     app.include_router(mcp_router)
 
     return app
