@@ -10,7 +10,7 @@ Security improvements:
 import asyncio
 import time
 import uuid
-from typing import Any, Dict, Optional, Set
+from typing import Any, Dict, List, Optional, Set
 
 from core.logger import get_logger
 
@@ -30,6 +30,7 @@ class ConfirmationRequest:
         session_id: str = "",
         call_id: str = "",
         timeout: float = 300.0,
+        remaining_calls: Optional[List[Dict[str, Any]]] = None,
     ):
         self.confirmation_id = confirmation_id
         self.tool_name = tool_name
@@ -38,6 +39,10 @@ class ConfirmationRequest:
         self.reason = reason
         self.session_id = session_id
         self.call_id = call_id
+        # Sibling tool calls of the same assistant turn, still unprocessed,
+        # as {tool_name, arguments, call_id} dicts in order. Lets a resume
+        # continue the turn instead of dropping them.
+        self.remaining_calls: List[Dict[str, Any]] = list(remaining_calls or [])
         self.approved: Optional[bool] = None
         self.resolved = False
         self.created_at = time.time()
@@ -100,10 +105,13 @@ class ConfirmationManager:
         session_id: str = "",
         call_id: str = "",
         timeout: Optional[float] = None,
+        remaining_calls: Optional[List[Dict[str, Any]]] = None,
     ) -> str:
         """Create a confirmation request.
 
         Returns the confirmation_id to include in the orchestrator response.
+        remaining_calls carries the sibling tool calls of the same assistant
+        turn so a resume can continue them instead of dropping them.
         """
         cid = f"confirm-{uuid.uuid4().hex[:8]}"
         req = ConfirmationRequest(
@@ -115,6 +123,7 @@ class ConfirmationManager:
             session_id=session_id,
             call_id=call_id,
             timeout=timeout or self._default_timeout,
+            remaining_calls=remaining_calls,
         )
         self._pending[cid] = req
         logger.info("Confirmation requested: %s (%s) — id: %s, session: %s",
@@ -130,7 +139,8 @@ class ConfirmationManager:
           - Single-use: removes the request after consumption
           - Not expired
 
-        Returns a dict with {approved, tool_name, arguments, call_id} or None if invalid.
+        Returns a dict with {approved, tool_name, arguments, call_id,
+        remaining_calls} or None if invalid.
         """
         req = self._pending.get(confirmation_id)
         if req is None:
@@ -164,6 +174,7 @@ class ConfirmationManager:
             "arguments": req.arguments,
             "call_id": req.call_id,
             "security_level": req.security_level,
+            "remaining_calls": list(req.remaining_calls),
         }
 
         # Single-use: track and remove

@@ -107,6 +107,133 @@ class Orchestrator:
             tool_call_id=tool_msg.tool_call_id, name=tool_msg.name,
         )
 
+    async def _process_single_call(
+        self, registry, tool_name, arguments, call_id, session_id, remaining_calls,
+    ) -> dict:
+        """Policy-gate and run ONE LLM-requested tool call (orchestrator source).
+
+        Every tool result is persisted exactly once via _persist_tool_result.
+        NEVER passes confirmed=True: approvals only arrive through consumed
+        confirmation ids handled by the caller. A new confirmation request
+        carries `remaining_calls` so the turn can continue on resume.
+
+        Returns {"action": "executed", "result", "tool_msg"},
+                {"action": "denied", "tool_msg"} (policy denial feedback), or
+                {"action": "confirm", "confirmation_id", "confirmation_details",
+                 "tool_name", "security_level", "reason"}.
+        """
+        logger.info("Tool call: %s(%s)", tool_name, json.dumps(arguments)[:100])
+
+        await self._event_bus.publish(SystemEvent(
+            event_type=EventType.TOOL_CALL,
+            source="orchestrator",
+            data={"tool_name": tool_name, "arguments": arguments, "call_id": call_id},
+        ))
+
+        # Check policy — NEVER pass confirmed=True from LLM path
+        tool = registry.get(tool_name)
+        if tool:
+            from security.policy_engine import PolicyEngine
+            policy = PolicyEngine()
+            decision = policy.evaluate(
+                tool.metadata, arguments, confirmed=False, source="orchestrator",
+            )
+
+            if not decision.allowed and decision.requires_confirmation:
+                cid = await self._confirmations.request_confirmation(
+                    tool_name=tool_name,
+                    arguments=arguments,
+                    security_level=tool.metadata.security_level.value,
+                    reason=decision.reason,
+                    session_id=session_id,
+                    call_id=call_id,
+                    remaining_calls=remaining_calls,
+                )
+
+                await self._event_bus.publish(SystemEvent(
+                    event_type=EventType.WAITING_CONFIRMATION,
+                    source="orchestrator",
+                    data={
+                        "confirmation_id": cid,
+                        "tool_name": tool_name,
+                        "arguments": arguments,
+                        "security_level": tool.metadata.security_level.value,
+                        "reason": decision.reason,
+                    },
+                ))
+
+                return {
+                    "action": "confirm",
+                    "confirmation_id": cid,
+                    "confirmation_details": f"Tool: {tool_name}, Arguments: {json.dumps(arguments)}",
+                    "tool_name": tool_name,
+                    "security_level": tool.metadata.security_level.value,
+                    "reason": decision.reason,
+                }
+
+            if not decision.allowed:
+                # Denied (not just "needs confirmation")
+                tool_msg = self._build_tool_result_message(
+                    tool_name, call_id,
+                    type('FakeResult', (), {
+                        'success': False, 'data': None, 'error': decision.reason,
+                        'execution_time_ms': 0, 'security_level': tool.metadata.security_level,
+                    })(),
+                    tool.metadata.security_level,
+                )
+                await self._persist_tool_result(session_id, tool_msg)
+                return {"action": "denied", "tool_msg": tool_msg}
+
+        # Execute the tool (GREEN or operator-approved) via orchestrator source
+        result = await self._tool_executor.execute_tool_call(
+            tool_name=tool_name,
+            arguments=arguments,
+            call_id=call_id,
+            source="orchestrator",
+        )
+
+        await self._event_bus.publish(SystemEvent(
+            event_type=EventType.TOOL_RESULT,
+            source="orchestrator",
+            data={
+                "tool_name": tool_name,
+                "call_id": call_id,
+                "success": result.success,
+                "error": result.error,
+            },
+        ))
+
+        tool_msg = self._build_tool_result_message(
+            tool_name, call_id, result,
+            tool.metadata.security_level if tool else None,
+        )
+        await self._persist_tool_result(session_id, tool_msg)
+        return {"action": "executed", "result": result, "tool_msg": tool_msg}
+
+    async def _resume_remaining_calls(self, registry, cid_result, session_id):
+        """Process sibling calls left over from a confirmed assistant turn.
+
+        Each call goes through the same policy gate (orchestrator source,
+        never pre-confirmed). Returns (results, confirm_outcome) where
+        confirm_outcome is None unless another call needs confirmation —
+        in which case it carries a fresh confirmation request and the turn
+        pauses again without breaking the sequence.
+        """
+        results = []
+        remaining = cid_result.get("remaining_calls") or []
+        for pos, item in enumerate(remaining):
+            outcome = await self._process_single_call(
+                registry,
+                item["tool_name"], item["arguments"], item["call_id"],
+                session_id, remaining[pos + 1:],
+            )
+            if outcome["action"] == "confirm":
+                return results, outcome
+            if outcome["action"] == "executed":
+                results.append(outcome["result"])
+            # Denied feedback is already persisted; keep going with the rest.
+        return results, None
+
     def _build_tool_result_message(self, tool_name, call_id, tool_result, security_level):
         """Convert a tool result to an LLM message."""
         from core.llm.converters import tool_result_to_message
@@ -165,6 +292,26 @@ class Orchestrator:
                     name=cid_result["tool_name"],
                 )
                 await self._persist_tool_result(session_id, denied_msg)
+                # Sibling calls of the same turn still get their own policy
+                # gate: denying one call does not cancel the others. They run
+                # BEFORE the denial text is persisted, so no assistant message
+                # ever interrupts pending tool calls.
+                registry, _ = await self._build_tools_list()
+                remaining_results, confirm = await self._resume_remaining_calls(
+                    registry, cid_result, session_id,
+                )
+                if confirm is not None:
+                    return OrchestratorResponse(
+                        session_id=session_id,
+                        response_text=f"I need your confirmation to execute '{confirm['tool_name']}'. "
+                                      f"Security level: {confirm['security_level']}. "
+                                      f"{confirm['reason']}",
+                        tool_calls_made=remaining_results,
+                        needs_confirmation=True,
+                        confirmation_id=confirm["confirmation_id"],
+                        confirmation_details=confirm["confirmation_details"],
+                        iterations_used=1,
+                    )
                 await self._conversation.append_message(
                     session_id, "assistant",
                     f"Action '{cid_result['tool_name']}' denied by user.",
@@ -173,6 +320,7 @@ class Orchestrator:
                     session_id=session_id,
                     response_text=f"Action '{cid_result['tool_name']}' denied.",
                     needs_confirmation=False,
+                    tool_calls_made=remaining_results,
                 )
 
             # Approved: execute the pending tool call via operator source.
@@ -211,7 +359,36 @@ class Orchestrator:
                 cid_result["tool_name"], cid_result["call_id"], result,
                 tool.metadata.security_level if tool else None,
             )
+            # Persist the approved tool result. The assistant(tool_calls) turn
+            # was already persisted when it was requested — only the result
+            # is new here, so this cannot duplicate anything.
+            await self._persist_tool_result(session_id, tool_msg)
+            results = [result]
 
+            # Continue the same assistant turn: run sibling calls left over
+            # in remaining_calls. Only when every call of the turn has exactly
+            # one persisted result do we advance to the next LLM call — this
+            # keeps the sequence valid for OpenAI-compatible providers.
+            remaining_results, confirm = await self._resume_remaining_calls(
+                registry, cid_result, session_id,
+            )
+            results.extend(remaining_results)
+            if confirm is not None:
+                return OrchestratorResponse(
+                    session_id=session_id,
+                    response_text=f"I need your confirmation to execute '{confirm['tool_name']}'. "
+                                  f"Security level: {confirm['security_level']}. "
+                                  f"{confirm['reason']}",
+                    tool_calls_made=results,
+                    needs_confirmation=True,
+                    confirmation_id=confirm["confirmation_id"],
+                    confirmation_details=confirm["confirmation_details"],
+                    iterations_used=1,
+                )
+
+            # History already contains every result persisted above (approved
+            # + remaining), so nothing is appended manually here — appending
+            # would duplicate them.
             history = await self._conversation.get_context_window(session_id)
             # Names come from the exact tool definitions sent to the provider
             # (already visibility-filtered) — never from the full registry,
@@ -225,27 +402,23 @@ class Orchestrator:
                 system_prompt=system_prompt,
                 conversation_messages=history,
             )
-            messages.append(tool_msg)
-            # Persist the approved tool result. The assistant(tool_calls) turn
-            # was already persisted when it was requested — only the result
-            # is new here, so this cannot duplicate anything.
-            await self._persist_tool_result(session_id, tool_msg)
 
             # Single LLM call to summarize the result. Never mask a tool
             # failure as success when the LLM returns no summary text.
             response = await self._call_llm(messages=messages, tools=tools)
+            failed = [r for r in results if not r.success]
             if response.content:
                 final_text = response.content
-            elif result.success:
+            elif not failed:
                 final_text = "Action completed."
             else:
-                final_text = f"Action '{cid_result['tool_name']}' failed: {result.error}"
+                final_text = f"Action '{failed[0].tool_name}' failed: {failed[0].error}"
             await self._conversation.append_message(session_id, "assistant", final_text)
 
             return OrchestratorResponse(
                 session_id=session_id,
                 response_text=final_text,
-                tool_calls_made=[result],
+                tool_calls_made=results,
                 iterations_used=1,
             )
 
@@ -334,110 +507,39 @@ class Orchestrator:
                 tool_calls_json=json.dumps([tc.model_dump() for tc in response.tool_calls]),
             )
 
-            for tc in response.tool_calls:
-                tool_name = tc.function.name
-                arguments = tc.function.arguments
-                call_id = tc.id
-
-                logger.info("Tool call: %s(%s)", tool_name, json.dumps(arguments)[:100])
-
-                await self._event_bus.publish(SystemEvent(
-                    event_type=EventType.TOOL_CALL,
-                    source="orchestrator",
-                    data={"tool_name": tool_name, "arguments": arguments, "call_id": call_id},
-                ))
-
-                # Check policy — NEVER pass confirmed=True from LLM path
-                tool = registry.get(tool_name)
-                if tool:
-                    from security.policy_engine import PolicyEngine
-                    policy = PolicyEngine()
-                    decision = policy.evaluate(
-                        tool.metadata, arguments, confirmed=False, source="orchestrator",
+            # NOTE: the pending state is intentionally NOT persisted as an
+            # assistant message anywhere below. Persisting it would inject
+            # assistant text between assistant(tool_calls) and its tool
+            # results, producing an invalid sequence for OpenAI-compatible
+            # providers. Pending requests live in the ConfirmationManager and
+            # travel in WAITING_CONFIRMATION events + responses instead.
+            for idx, tc in enumerate(response.tool_calls):
+                # Sibling calls after this one ride along in the confirmation
+                # (remaining_calls) so a resume continues the turn instead of
+                # dropping them and leaving calls unanswered.
+                remaining = [
+                    {"tool_name": t.function.name, "arguments": t.function.arguments, "call_id": t.id}
+                    for t in response.tool_calls[idx + 1:]
+                ]
+                outcome = await self._process_single_call(
+                    registry, tc.function.name, tc.function.arguments, tc.id,
+                    session_id, remaining,
+                )
+                if outcome["action"] == "confirm":
+                    return OrchestratorResponse(
+                        session_id=session_id,
+                        response_text=f"I need your confirmation to execute '{outcome['tool_name']}'. "
+                                      f"Security level: {outcome['security_level']}. "
+                                      f"{outcome['reason']}",
+                        tool_calls_made=all_tool_results,
+                        needs_confirmation=True,
+                        confirmation_id=outcome["confirmation_id"],
+                        confirmation_details=outcome["confirmation_details"],
+                        iterations_used=iterations,
                     )
-
-                    if not decision.allowed and decision.requires_confirmation:
-                        cid = await self._confirmations.request_confirmation(
-                            tool_name=tool_name,
-                            arguments=arguments,
-                            security_level=tool.metadata.security_level.value,
-                            reason=decision.reason,
-                            session_id=session_id,
-                            call_id=call_id,
-                        )
-
-                        await self._event_bus.publish(SystemEvent(
-                            event_type=EventType.WAITING_CONFIRMATION,
-                            source="orchestrator",
-                            data={
-                                "confirmation_id": cid,
-                                "tool_name": tool_name,
-                                "arguments": arguments,
-                                "security_level": tool.metadata.security_level.value,
-                                "reason": decision.reason,
-                            },
-                        ))
-
-                        # NOTE: the pending state is intentionally NOT persisted
-                        # as an assistant message. Persisting it here would
-                        # inject assistant text between assistant(tool_calls)
-                        # and its tool results, producing an invalid sequence
-                        # for OpenAI-compatible providers. The pending request
-                        # lives in the ConfirmationManager and travels in the
-                        # WAITING_CONFIRMATION event + this response instead.
-                        return OrchestratorResponse(
-                            session_id=session_id,
-                            response_text=f"I need your confirmation to execute '{tool_name}'. "
-                                          f"Security level: {tool.metadata.security_level.value}. "
-                                          f"{decision.reason}",
-                            tool_calls_made=all_tool_results,
-                            needs_confirmation=True,
-                            confirmation_id=cid,
-                            confirmation_details=f"Tool: {tool_name}, Arguments: {json.dumps(arguments)}",
-                            iterations_used=iterations,
-                        )
-
-                    if not decision.allowed:
-                        # Denied (not just "needs confirmation")
-                        tool_msg = self._build_tool_result_message(
-                            tool_name, call_id,
-                            type('FakeResult', (), {
-                                'success': False, 'data': None, 'error': decision.reason,
-                                'execution_time_ms': 0, 'security_level': tool.metadata.security_level,
-                            })(),
-                            tool.metadata.security_level,
-                        )
-                        messages.append(tool_msg)
-                        await self._persist_tool_result(session_id, tool_msg)
-                        continue
-
-                # Execute the tool (GREEN or operator-approved) via orchestrator source
-                result = await self._tool_executor.execute_tool_call(
-                    tool_name=tool_name,
-                    arguments=arguments,
-                    call_id=call_id,
-                    source="orchestrator",
-                )
-                all_tool_results.append(result)
-
-                await self._event_bus.publish(SystemEvent(
-                    event_type=EventType.TOOL_RESULT,
-                    source="orchestrator",
-                    data={
-                        "tool_name": tool_name,
-                        "call_id": call_id,
-                        "success": result.success,
-                        "error": result.error,
-                    },
-                ))
-
-                # Add tool result to context for LLM
-                tool_msg = self._build_tool_result_message(
-                    tool_name, call_id, result,
-                    tool.metadata.security_level if tool else None,
-                )
-                messages.append(tool_msg)
-                await self._persist_tool_result(session_id, tool_msg)
+                if outcome["action"] == "executed":
+                    all_tool_results.append(outcome["result"])
+                messages.append(outcome["tool_msg"])
 
         if iterations >= MAX_TOOL_ITERATIONS and not final_text:
             final_text = "I've reached the maximum number of tool call iterations. Please try a simpler request."
