@@ -86,6 +86,52 @@ def test_undeclared_string_params_stay_strict():
     assert allowed.allowed is True
 
 
+@pytest.mark.asyncio
+async def test_file_tools_accept_parens_end_to_end(tmp_path):
+    """Policy AND real execution agree on PATH semantics (Problem 1).
+
+    Goes through ToolRegistry.execute_tool (PolicyEngine + tool), proving
+    a path like "dir (test)/a (b).txt" is allowed by the policy and not
+    denied again at execution.
+    """
+    from types import SimpleNamespace
+    from unittest.mock import patch
+    from tools.builtin.file_tool import ReadFileTool, WriteFileTool, ListDirTool
+
+    settings = SimpleNamespace(allowed_apps={}, allowed_paths=[str(tmp_path)])
+    registry = ToolRegistry()
+    registry.register(ReadFileTool())
+    registry.register(WriteFileTool())
+    registry.register(ListDirTool())
+
+    content = "custo R$ 10 & frete (grátis)\nlinha 2"
+    rel_path = "dir (test)/a (b).txt"
+    target = tmp_path / rel_path
+    target.parent.mkdir(parents=True, exist_ok=True)
+
+    with patch("security.allowlist.get_settings", return_value=settings):
+        written = await registry.execute_tool(
+            "write_file",
+            {"file_path": str(target), "content": content},
+            confirmed=True, source="operator",
+        )
+        assert written.success is True, written.error
+
+        read = await registry.execute_tool(
+            "read_file", {"file_path": str(target)},
+            confirmed=True, source="operator",
+        )
+        assert read.success is True, read.error
+        assert read.data["content"] == content
+
+        listed = await registry.execute_tool(
+            "list_dir", {"directory": str(target.parent)},
+            confirmed=True, source="operator",
+        )
+        assert listed.success is True, listed.error
+        assert "a (b).txt" in [e["name"] for e in listed.data["entries"]]
+
+
 def test_param_kind_enum_values():
     assert {k.value for k in ParamKind} == {"FREE_TEXT", "PATH", "URL", "SHELL_ARG", "IDENT"}
 

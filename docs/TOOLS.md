@@ -68,7 +68,7 @@ class BaseTool(ABC):
 * Opt-in para LAN via `JARVIS_NET_ALLOW_PRIVATE_NETWORKS`.
 
 ### File Sandbox (read_file, write_file, list_dir)
-* Validação via `AllowlistValidator.validate_file_path()`.
+* Validação via `AllowlistValidator.validate_sandbox_path()` (mesma semântica PATH do PolicyEngine).
 * Resolve symlinks antes de validar.
 * Usa `relative_to()` para containment (previne prefix trick).
 * Bloqueia paths fora de `allowed_paths`.

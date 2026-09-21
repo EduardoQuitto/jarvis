@@ -36,7 +36,10 @@ class ReadFileTool(BaseTool):
         validator = AllowlistValidator()
 
         try:
-            resolved = validator.validate_file_path(file_path, must_exist=False)
+            # Same PATH semantics as PolicyEngine: sandbox containment,
+            # traversal and symlink safety, WITHOUT shell sanitization
+            # (names like "Program Files (x86)" must work).
+            resolved = validator.validate_sandbox_path(file_path)
         except SecurityValidationError as e:
             return ToolResult.fail(
                 error=f"Access denied: {e}",
@@ -71,7 +74,8 @@ class WriteFileTool(BaseTool):
         validator = AllowlistValidator()
 
         try:
-            resolved = validator.validate_file_path(file_path, must_exist=False)
+            # Same PATH semantics as PolicyEngine (see ReadFileTool).
+            resolved = validator.validate_sandbox_path(file_path)
         except SecurityValidationError as e:
             return ToolResult.fail(
                 error=f"Access denied: {e}",
@@ -103,7 +107,8 @@ class ListDirTool(BaseTool):
         validator = AllowlistValidator()
 
         try:
-            resolved = validator.validate_file_path(directory, must_exist=False)
+            # Same PATH semantics as PolicyEngine (see ReadFileTool).
+            resolved = validator.validate_sandbox_path(directory)
         except SecurityValidationError as e:
             return ToolResult.fail(
                 error=f"Access denied: {e}",

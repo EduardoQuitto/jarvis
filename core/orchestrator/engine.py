@@ -154,6 +154,17 @@ class Orchestrator:
                 )
 
             if not cid_result["approved"]:
+                # Close the pending tool call with an honest tool result so
+                # the sequence stays valid (assistant(tc) -> tool -> assistant).
+                # A bare denial text would leave the call unanswered, which
+                # OpenAI-compatible providers reject.
+                denied_msg = LLMMessage(
+                    role="tool",
+                    content=f"Action '{cid_result['tool_name']}' was denied by the user and was not executed.",
+                    tool_call_id=cid_result["call_id"] or "denied",
+                    name=cid_result["tool_name"],
+                )
+                await self._persist_tool_result(session_id, denied_msg)
                 await self._conversation.append_message(
                     session_id, "assistant",
                     f"Action '{cid_result['tool_name']}' denied by user.",
@@ -367,9 +378,13 @@ class Orchestrator:
                             },
                         ))
 
-                        status_msg = f"[Action requires confirmation: {tool_name}]"
-                        await self._conversation.append_message(session_id, "assistant", status_msg)
-
+                        # NOTE: the pending state is intentionally NOT persisted
+                        # as an assistant message. Persisting it here would
+                        # inject assistant text between assistant(tool_calls)
+                        # and its tool results, producing an invalid sequence
+                        # for OpenAI-compatible providers. The pending request
+                        # lives in the ConfirmationManager and travels in the
+                        # WAITING_CONFIRMATION event + this response instead.
                         return OrchestratorResponse(
                             session_id=session_id,
                             response_text=f"I need your confirmation to execute '{tool_name}'. "
