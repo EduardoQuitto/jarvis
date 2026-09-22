@@ -2,6 +2,7 @@
 
 import json
 import os
+import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from datetime import datetime, timezone
@@ -164,6 +165,30 @@ class SQLiteMemoryProvider(BaseMemoryProvider):
         await self._db.execute("""
             CREATE INDEX IF NOT EXISTS idx_events_type
             ON events(event_type)
+        """)
+
+        # Central confirmation state (single-use, session-bound approvals).
+        # Epoch timestamps keep expiry checks atomic inside SQL.
+        await self._db.execute("""
+            CREATE TABLE IF NOT EXISTS confirmations (
+                confirmation_id TEXT PRIMARY KEY,
+                tool_name TEXT NOT NULL,
+                arguments_json TEXT NOT NULL DEFAULT '{}',
+                security_level TEXT NOT NULL DEFAULT 'YELLOW',
+                reason TEXT NOT NULL DEFAULT '',
+                session_id TEXT NOT NULL DEFAULT '',
+                call_id TEXT NOT NULL DEFAULT '',
+                remaining_calls_json TEXT NOT NULL DEFAULT '[]',
+                created_at REAL NOT NULL,
+                timeout_seconds REAL NOT NULL DEFAULT 300.0,
+                approved INTEGER,
+                resolved_at REAL,
+                consumed INTEGER NOT NULL DEFAULT 0
+            )
+        """)
+        await self._db.execute("""
+            CREATE INDEX IF NOT EXISTS idx_confirmations_session
+            ON confirmations(session_id)
         """)
 
         await self._db.commit()
@@ -483,6 +508,116 @@ class SQLiteMemoryProvider(BaseMemoryProvider):
                 return [dict(row) for row in await cursor.fetchall()]
 
     # --- Search methods ---
+
+    async def create_confirmation(
+        self,
+        confirmation_id: str,
+        tool_name: str,
+        arguments_json: str = "{}",
+        security_level: str = "YELLOW",
+        reason: str = "",
+        session_id: str = "",
+        call_id: str = "",
+        remaining_calls_json: str = "[]",
+        timeout_seconds: float = 300.0,
+        created_at: Optional[float] = None,
+    ) -> None:
+        """Create a pending confirmation (raises on duplicate id)."""
+        db = await self._get_connection()
+        await db.execute(
+            """INSERT INTO confirmations
+               (confirmation_id, tool_name, arguments_json, security_level, reason,
+                session_id, call_id, remaining_calls_json, created_at, timeout_seconds)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                confirmation_id, tool_name, arguments_json, security_level, reason,
+                session_id, call_id, remaining_calls_json,
+                created_at if created_at is not None else time.time(),
+                timeout_seconds,
+            ),
+        )
+        await db.commit()
+
+    async def get_confirmation(self, confirmation_id: str) -> Optional[dict]:
+        """Fetch a confirmation row by id."""
+        db = await self._get_connection()
+        async with db.execute(
+            "SELECT * FROM confirmations WHERE confirmation_id = ?", (confirmation_id,),
+        ) as cursor:
+            row = await cursor.fetchone()
+            return dict(row) if row else None
+
+    async def resolve_confirmation(
+        self, confirmation_id: str, approved: bool, now: Optional[float] = None,
+    ) -> bool:
+        """Approve/deny a confirmation only if unresolved, unconsumed and unexpired."""
+        if now is None:
+            now = time.time()
+        db = await self._get_connection()
+        cursor = await db.execute(
+            """UPDATE confirmations SET approved = ?, resolved_at = ?
+               WHERE confirmation_id = ? AND resolved_at IS NULL AND consumed = 0
+               AND (created_at + timeout_seconds > ?)""",
+            (1 if approved else 0, now, confirmation_id, now),
+        )
+        await db.commit()
+        return cursor.rowcount > 0
+
+    async def consume_confirmation(
+        self, confirmation_id: str, session_id: str, now: Optional[float] = None,
+    ) -> Optional[dict]:
+        """Atomically claim a resolved confirmation (single-use).
+
+        Succeeds only when the record is resolved, unexpired, unconsumed and
+        session-bound correctly.         Concurrent consumes: exactly one wins.
+        """
+        if now is None:
+            now = time.time()
+        db = await self._get_connection()
+        row = await self.get_confirmation(confirmation_id)
+        if row is None:
+            return None
+        if row["resolved_at"] is None or row["consumed"]:
+            return None
+        if row["created_at"] + row["timeout_seconds"] <= now:
+            return None
+        stored_session = row["session_id"] or ""
+        if session_id and stored_session and session_id != stored_session:
+            return None
+        cursor = await db.execute(
+            "UPDATE confirmations SET consumed = 1 WHERE confirmation_id = ? AND consumed = 0",
+            (confirmation_id,),
+        )
+        await db.commit()
+        if cursor.rowcount == 0:
+            return None  # lost a concurrent race
+        return await self.get_confirmation(confirmation_id)
+
+    async def list_pending_confirmations(self, now: Optional[float] = None) -> list:
+        """List unresolved, unexpired, unconsumed confirmations."""
+        if now is None:
+            now = time.time()
+        db = await self._get_connection()
+        async with db.execute(
+            """SELECT * FROM confirmations
+               WHERE consumed = 0 AND resolved_at IS NULL
+               AND (created_at + timeout_seconds > ?)
+               ORDER BY created_at ASC""",
+            (now,),
+        ) as cursor:
+            return [dict(row) for row in await cursor.fetchall()]
+
+    async def cleanup_confirmations(self, now: Optional[float] = None) -> int:
+        """Delete consumed or expired confirmations. Returns rows removed."""
+        if now is None:
+            now = time.time()
+        db = await self._get_connection()
+        cursor = await db.execute(
+            "DELETE FROM confirmations WHERE consumed = 1 OR (created_at + timeout_seconds <= ?)",
+            (now,),
+        )
+        await db.commit()
+        return cursor.rowcount
 
     async def search_memory(self, query: str, limit: int = 10) -> list:
         """Search memory entries by key or value content."""

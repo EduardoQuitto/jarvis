@@ -40,6 +40,11 @@ class Settings(BaseSettings):
     node_advertise_ip: Optional[str] = Field(default="", description="LAN IP announced to the SERVER (empty = not announced)")
     node_advertise_port: Optional[int] = Field(default=0, description="Port announced to the SERVER (0 = not announced)")
 
+    # Central state (SERVER = source of truth, CORE = compute plane).
+    # Disabled by default: local SQLite behavior is preserved for tests/dev.
+    central_state_enabled: bool = Field(default=False, description="Route conversations/memory/confirmations through the SERVER")
+    central_state_required: bool = Field(default=False, description="Fail explicitly when central state is unreachable (no local fallback)")
+
     # Security & Policy Settings
     allowlist_enabled: bool = Field(default=True, description="Enforce strict allowlist on actions and apps")
     confirm_yellow_actions: bool = Field(default=True, description="Require confirmation before executing yellow actions")

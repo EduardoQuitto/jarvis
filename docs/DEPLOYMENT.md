@@ -68,3 +68,44 @@ curl http://127.0.0.1:8000/health -H "Authorization: Bearer YOUR_API_KEY"
 ```bash
 pytest -v    # Ensure all 230 tests pass
 ```
+
+## Phase 12 Manual Checklist (Ubuntu SERVER + Windows CORE)
+
+No remote deploy is automated. With the Ubuntu SERVER on, configure manually:
+
+**SERVER `.env` (Ubuntu, never leaves the machine):**
+```env
+JARVIS_NODE_ID=jarvis-server
+JARVIS_NODE_ROLE=SERVER
+JARVIS_HOST=0.0.0.0
+JARVIS_PORT=8000
+JARVIS_API_KEY=<shared-node-key>
+JARVIS_GOOGLE_API_KEY=<gemini-key-only-here>
+JARVIS_GOOGLE_MODEL=gemini-3.7-flash
+JARVIS_GOOGLE_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/
+JARVIS_DB_PATH=./data/jarvis.db
+```
+
+**CORE `.env` (Windows, no Gemini key here):**
+```env
+JARVIS_NODE_ID=jarvis-core
+JARVIS_NODE_ROLE=CORE
+JARVIS_SERVER_URL=http://192.168.0.13:8000
+JARVIS_SERVER_API_KEY=<same-shared-node-key>
+JARVIS_CENTRAL_STATE_ENABLED=true
+# Cloud slot routed THROUGH the SERVER relay (node key, not the Gemini key):
+JARVIS_GOOGLE_BASE_URL=http://192.168.0.13:8000/api/llm
+JARVIS_GOOGLE_API_KEY=<same-shared-node-key>
+JARVIS_GOOGLE_MODEL=gemini-3.7-flash
+```
+
+**Verify (from the CORE machine):**
+```bash
+python scripts/check_remote_server.py   # health/tools/echo on SERVER
+python scripts/check_remote_tasks.py    # task lifecycle on SERVER
+python scripts/check_google_provider.py # Gemini via SERVER relay
+```
+
+**External access (future, NOT implemented):** external client → secure
+private network / VPN (future phase) → SERVER → CORE. Never expose JARVIS
+directly to the public internet; no port-forwarding without VPN + auth.

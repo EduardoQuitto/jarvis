@@ -4,8 +4,10 @@ import json
 import uuid
 from typing import Dict, List, Optional
 
+from core.config import get_settings
 from core.contracts.llm import LLMMessage, LLMToolCall
 from core.contracts.conversation import ConversationMessage, ConversationSession
+from core.network.central_state_client import CentralStateClient, CentralStateError
 from memory.sqlite_provider import SQLiteMemoryProvider
 from core.logger import get_logger
 
@@ -13,17 +15,57 @@ logger = get_logger("jarvis.conversation")
 
 
 class ConversationManager:
-    """Manages conversation sessions, persists messages, and provides context windows."""
+    """Manages conversation sessions, persists messages, and provides context windows.
 
-    def __init__(self, memory: Optional[SQLiteMemoryProvider] = None, max_context_messages: int = 40):
+    Accepts an optional central-state backend (CentralStateClient or any object
+    with the same conversation methods). When omitted, central mode is resolved
+    from settings: JARVIS_CENTRAL_STATE_ENABLED routes persistence through the
+    SERVER, otherwise local SQLite is used exactly as before.
+    """
+
+    def __init__(
+        self,
+        memory: Optional[SQLiteMemoryProvider] = None,
+        max_context_messages: int = 40,
+        central_state=None,
+    ):
         self._memory = memory
         self._max_context = max_context_messages
         self._local_sessions: Dict[str, List[ConversationMessage]] = {}
+        self._central_state = central_state
+        self._central_resolved = False
 
     def _get_memory(self) -> SQLiteMemoryProvider:
         if self._memory is None:
             self._memory = SQLiteMemoryProvider()
         return self._memory
+
+    def _get_central(self):
+        """Resolve the central backend once (None = local mode)."""
+        if not self._central_resolved:
+            self._central_resolved = True
+            if self._central_state is False:
+                self._central_state = None
+            elif self._central_state is None:
+                self._central_state = CentralStateClient.from_settings()
+        return self._central_state
+
+    def _central_required(self) -> bool:
+        return get_settings().central_state_required
+
+    def _central_or_raise(self, operation: str, error: CentralStateError):
+        """Required mode: explicit failure. Otherwise: warn and fall back local."""
+        if self._central_required():
+            raise CentralStateError(
+                f"Central state required but unavailable during {operation} "
+                f"({error.kind}): {error.message}",
+                kind=error.kind,
+                status_code=error.status_code,
+            ) from error
+        logger.warning(
+            "Central state failed during %s (%s); falling back to local SQLite",
+            operation, error.kind,
+        )
 
     async def create_session(
         self,
@@ -32,6 +74,14 @@ class ConversationManager:
     ) -> str:
         """Create a new conversation session and return its ID."""
         session_id = f"sess-{uuid.uuid4().hex[:12]}"
+        central = self._get_central()
+        if central is not None:
+            try:
+                await central.create_conversation(session_id, title=title, device_id=device_id)
+                logger.info("Created central conversation session: %s", session_id)
+                return session_id
+            except CentralStateError as e:
+                self._central_or_raise("create_session", e)
         try:
             mem = self._get_memory()
             await mem.create_conversation(session_id, title=title, device_id=device_id)
@@ -59,6 +109,18 @@ class ConversationManager:
             tool_call_id=tool_call_id,
             name=name,
         )
+        central = self._get_central()
+        if central is not None:
+            try:
+                await central.append_message(
+                    session_id, role, content,
+                    tool_calls_json=tool_calls_json,
+                    tool_call_id=tool_call_id,
+                    name=name,
+                )
+                return
+            except CentralStateError as e:
+                self._central_or_raise("append_message", e)
         try:
             mem = self._get_memory()
             await mem.append_conversation_message(
@@ -82,6 +144,27 @@ class ConversationManager:
         OpenAI-compatible providers reject payloads starting with an orphan
         tool message.
         """
+        central = self._get_central()
+        if central is not None:
+            try:
+                rows = await central.get_messages(session_id, limit=limit)
+                messages = [
+                    ConversationMessage(
+                        id=row.get("id"),
+                        conversation_id=session_id,
+                        role=row["role"],
+                        content=row.get("content") or "",
+                        tool_calls_json=row.get("tool_calls_json"),
+                        tool_call_id=row.get("tool_call_id"),
+                        name=row.get("name"),
+                    )
+                    for row in rows
+                ]
+                while messages and messages[0].role == "tool":
+                    messages.pop(0)
+                return messages
+            except CentralStateError as e:
+                self._central_or_raise("get_history", e)
         try:
             mem = self._get_memory()
             rows = await mem.get_conversation_history(session_id, limit=limit)
@@ -131,6 +214,21 @@ class ConversationManager:
 
     async def list_sessions(self, limit: int = 20) -> List[ConversationSession]:
         """List recent conversation sessions."""
+        central = self._get_central()
+        if central is not None:
+            try:
+                rows = await central.list_conversations(limit=limit)
+                return [
+                    ConversationSession(
+                        id=row["id"],
+                        title=row.get("title"),
+                        device_id=row.get("device_id"),
+                        message_count=int(row.get("message_count") or 0),
+                    )
+                    for row in rows
+                ]
+            except CentralStateError as e:
+                self._central_or_raise("list_sessions", e)
         try:
             mem = self._get_memory()
             rows = await mem.list_conversations(limit=limit)
@@ -149,6 +247,20 @@ class ConversationManager:
 
     async def get_session_info(self, session_id: str) -> Optional[ConversationSession]:
         """Get info about a specific session."""
+        central = self._get_central()
+        if central is not None:
+            try:
+                row = await central.get_conversation(session_id)
+                if row is None:
+                    return None
+                return ConversationSession(
+                    id=row["id"],
+                    title=row.get("title"),
+                    device_id=row.get("device_id"),
+                    message_count=int(row.get("message_count") or 0),
+                )
+            except CentralStateError as e:
+                self._central_or_raise("get_session_info", e)
         try:
             mem = self._get_memory()
             async with mem._get_connection() as conn:

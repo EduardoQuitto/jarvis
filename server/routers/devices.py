@@ -127,6 +127,9 @@ async def list_devices(
                 "device_type": d.device_type.value,
                 "status": d.status.value,
                 "capabilities": [c.value if hasattr(c, 'value') else c for c in d.capabilities],
+                "version": d.version,
+                "ip_address": d.ip_address,
+                "port": d.port,
                 "last_seen": d.last_seen.isoformat() if hasattr(d.last_seen, 'isoformat') else str(d.last_seen),
             }
             for d in devices
@@ -150,6 +153,9 @@ async def list_online_devices(
                 "name": d.name,
                 "device_type": d.device_type.value,
                 "status": d.status.value,
+                "capabilities": [c.value if hasattr(c, 'value') else c for c in d.capabilities],
+                "ip_address": d.ip_address,
+                "port": d.port,
             }
             for d in devices
         ]
