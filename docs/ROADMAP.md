@@ -138,7 +138,7 @@ SERVER = control plane / source of truth. CORE = compute plane (Orchestrator, LL
 - [x] Arquitetura preparada para futuro acesso externo seguro sem exposição pública.
 - [x] 440 testes coletados, 438 passando, 0 falhas, 2 skips; `compileall` e `diff --check` limpos.
 
-#### Próxima sessão — validação operacional da Fase 12
+#### Validação operacional da Fase 12 (Concluída)
 
 1. Ligar o Ubuntu Server.
 2. Conferir/configurar manualmente o `.env` do SERVER, incluindo a credencial Gemini **somente no SERVER**.
