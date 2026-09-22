@@ -110,7 +110,7 @@
 
 ---
 
-### Fase 12: Central Server & Central State Authority (Em operação)
+### ✅ Fase 12: Central Server & Central State Authority (Concluída)
 
 SERVER = control plane / source of truth. CORE = compute plane (Orchestrator, LLM, tools locais).
 
@@ -124,6 +124,24 @@ SERVER = control plane / source of truth. CORE = compute plane (Orchestrator, LL
 - [x] Gemini via SERVER: chave somente no SERVER; relay `POST /api/llm/chat/completions` (+ `/models`, streaming); CORE acessa via relay sem possuir a chave; `search_memory` com fallback local em modo não-required e falha explícita em modo required.
 - [ ] Acesso externo futuro via rede privada/VPN (não implementado; arquitetura já separa gateway SERVER de compute CORE).
 - [x] Descoberta via `DeviceRegistry` existente (`/api/devices/` agora expõe ip/porta/capabilities/status); V1 seleciona o primeiro elegível, sem fila/scheduler/workers.
+
+#### ✅ Validação operacional da Fase 12 (Concluída)
+
+SERVER = control plane / source of truth; CORE = compute plane. Resultados verificados contra hardware real:
+
+- [x] SERVER Ubuntu (`jarvisserver`, LAN `192.168.0.13`): `jarvis.service` funcionando, FastAPI/Uvicorn em `0.0.0.0:8000`, `/health` retornando `healthy` (serviço parado e reiniciado durante a validação).
+- [x] CORE Windows (LAN `192.168.0.8`): Ollama funcionando com `qwen3.5:4b`; auto-registro no SERVER + heartbeat periódico; SERVER identifica o dispositivo como `CORE` com capacidade `llm`.
+- [x] Fluxo distribuído real cliente -> SERVER -> CORE -> Ollama -> SERVER -> cliente via `POST /api/chat/send`, com resposta real recebida; SERVER retorna HTTP 503 sem CORE elegível e o fluxo volta após a recuperação do CORE.
+- [x] Conversas centralizadas: mensagens persistidas no SERVER, sequência user -> assistant/tool call -> tool result -> assistant final verificada.
+- [x] Memória central: CORE com `CentralMemoryProvider`, escrita/leitura via estado central, valor de teste recuperado corretamente.
+- [x] Confirmações centralizadas: criação, aprovação, consumo pelo CORE, single-use (segunda tentativa bloqueada), session binding/expiração funcionando.
+- [x] Gemini: chave real somente no SERVER (CORE sem a chave), acesso via relay do SERVER, `gemini-3.5-flash-lite` validado com geração real (health + generation OK).
+- [x] Streaming: `POST /api/chat/stream` (`text/event-stream`) com eventos `start`, `thinking`, `tool_call`, `tool_result`, `text_delta` e `done`; resposta final persistida no SERVER; desconexão do cliente sem traceback/ERROR nos logs do SERVER.
+- [x] Task Bridge: criação, consulta, atualização de progresso, conclusão e leitura do estado final via lifecycle remoto.
+- [x] Segurança/repositório: `.env` não versionado (só `.env.example`); nenhuma chave Gemini real no Git; `.gitignore` protege `.env`, bancos e ambientes virtuais.
+- [x] Testes da fase: 440 coletados, 438 passando, 0 falhas, 2 skips; `compileall` limpo; `git diff --check` limpo.
+
+Acesso externo (fora de casa) continua futuro e não implementado: quando existir, será cliente externo -> rede privada segura/VPN -> SERVER -> CORE, nunca exposição direta à internet pública. Fases futuras (voz, Android, visão, Home Assistant) seguem não implementadas.
 
 ### Próximas Fases (Futuras)
 
