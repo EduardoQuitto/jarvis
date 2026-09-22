@@ -166,7 +166,35 @@ SERVER = control plane / source of truth. CORE = compute plane (Orchestrator, LL
 - [ ] Observabilidade do acesso remoto sem criar dependência de exposição pública.
 - [ ] Não implementar até a Fase 12 estar validada localmente.
 
-### 🏠 Fase 14: Integração Home Assistant
+## . 📞Fase 14: Telefonia & Agente de Chamadas
+
+- [ ] Integrar um **número de telefone ao J.A.R.V.I.S.**, criando uma identidade telefônica própria para o agente.
+- [ ] Permitir que o J.A.R.V.I.S. **realize chamadas telefônicas de saída** a partir de instruções do usuário.
+- [ ] Permitir que o J.A.R.V.I.S. **atenda chamadas recebidas** automaticamente.
+- [ ] Permitir que o J.A.R.V.I.S. converse em tempo real com a pessoa durante a ligação.
+- [ ] Implementar o pipeline completo de chamada: **chamada → áudio/STT → Orchestrator → LLM/Tools → TTS → áudio**.
+- [ ] Usar o mesmo `Orchestrator`, memória, Goals, Tasks, contexto e sistema de segurança do J.A.R.V.I.S.
+- [ ] Identificar o número/contato que está ligando e associá-lo à identidade correspondente quando possível.
+- [ ] Permitir que o J.A.R.V.I.S. consulte informações e execute ações autorizadas durante uma ligação.
+- [ ] Permitir que o J.A.R.V.I.S. **faça ligações para empresas, serviços, pessoas ou contatos** de acordo com instruções explícitas do usuário.
+- [ ] Permitir definir um **objetivo de chamada**, como obter informação, confirmar disponibilidade, solicitar orçamento, acompanhar uma solicitação ou transmitir uma mensagem.
+- [ ] Permitir que o J.A.R.V.I.S. registre o resultado da chamada no estado central do SERVER.
+- [ ] Registrar transcrição, resumo, resultado, duração e ações realizadas de forma controlada.
+- [ ] Permitir que o J.A.R.V.I.S. **solicite ajuda ao usuário durante uma chamada** quando não conseguir concluir a tarefa sozinho.
+- [ ] Permitir transferência ou encaminhamento da chamada para o usuário quando necessário.
+- [ ] Permitir que o J.A.R.V.I.S. reconheça quando uma chamada exige intervenção humana.
+- [ ] Implementar **allowlist, autenticação e identificação de chamadas** para evitar que números não autorizados controlem o sistema.
+- [ ] Aplicar `PolicyEngine`, `ConfirmationManager` e demais controles de segurança também às ações iniciadas através de chamadas.
+- [ ] Exigir confirmação apropriada para ações sensíveis, financeiras, destrutivas ou que possam comprometer o usuário.
+- [ ] Separar claramente **comunicação telefônica** de **autorização para executar ações**.
+- [ ] Implementar reconexão, tratamento de falhas de áudio, timeout e recuperação de chamadas.
+- [ ] Evitar dependência rígida de um único provedor de telefonia.
+- [ ] Priorizar integrações e APIs oficiais de telefonia quando disponíveis.
+- [ ] Preparar a arquitetura para futuramente suportar **SMS, voicemail e outros canais de comunicação**.
+- [ ] Manter o SERVER como autoridade central e o CORE como camada de processamento.
+- [ ] O canal telefônico deve ser apenas mais uma interface do mesmo J.A.R.V.I.S., sem criar uma inteligência paralela.
+
+### 🏠 Fase 15: Integração Home Assistant
 - [ ] Home Assistant como backbone de automação doméstica.
 - [ ] Scheduler e automações no SERVER.
 - [ ] Wake-on-LAN para acordar o CORE quando necessário.
@@ -174,7 +202,7 @@ SERVER = control plane / source of truth. CORE = compute plane (Orchestrator, LL
 - [ ] SERVER continua leve; processamento pesado permanece no CORE.
 - [ ] Integração deve respeitar o mesmo modelo central de identidade, estado e autorização.
 
-### 🎙️ Fase 15: Pipeline de Voz Local
+### 🎙️ Fase 16: Pipeline de Voz Local
 - [ ] Wake Word.
 - [ ] VAD (detecção de atividade de voz).
 - [ ] STT local, inicialmente com Whisper ou alternativa equivalente.
@@ -183,7 +211,7 @@ SERVER = control plane / source of truth. CORE = compute plane (Orchestrator, LL
 - [ ] Voz deve utilizar o mesmo JARVIS central, memória, Goals e segurança.
 - [ ] Não criar uma segunda inteligência paralela.
 
-### 📱 Fase 16: Android & Tablet Dashboard
+### 📱 Fase 17: Android & Tablet Dashboard
 - [ ] Priorizar Home Assistant Companion e/ou ADB para integração Android.
 - [ ] Telemetria, notificações, câmera, microfone e sensores.
 - [ ] Comunicação do S20 com o SERVER central.
@@ -193,7 +221,7 @@ SERVER = control plane / source of truth. CORE = compute plane (Orchestrator, LL
 - [ ] Ações sensíveis no Android continuam passando pelo modelo de segurança do JARVIS.
 - [ ] O canal telefônico deve tratar identidade, autorização, logs e limites de uso antes de permitir ações reais.
 
-### 👁️ Fase 17: Visão Computacional
+### 👁️ Fase 18: Visão Computacional
 - [ ] Captura de tela.
 - [ ] OCR quando necessário.
 - [ ] Análise visual local.
@@ -202,7 +230,7 @@ SERVER = control plane / source of truth. CORE = compute plane (Orchestrator, LL
 - [ ] A percepção visual nunca deve conceder autorização automaticamente.
 - [ ] Preparar a base necessária para Computer Use da Fase 20.
 
-### 🧠 Fase 18: Memória Vetorial & Busca Semântica
+### 🧠 Fase 19: Memória Vetorial & Busca Semântica
 - [ ] Adicionar embeddings locais e busca semântica.
 - [ ] Integrar a busca semântica à **memória central já existente**.
 - [ ] SERVER continua sendo a autoridade do estado persistente.
@@ -213,7 +241,7 @@ SERVER = control plane / source of truth. CORE = compute plane (Orchestrator, LL
 - [ ] Definir política de retenção, indexação, atualização e exclusão.
 - [ ] Recuperação semântica deve respeitar permissões e isolamento de dados.
 
-### 🤖 Fase 19: Autonomia Progressiva & Goal-Driven Intelligence
+### 🤖 Fase 20: Autonomia Progressiva & Goal-Driven Intelligence
 - [ ] Evoluir o fluxo **Goal → Plan → Steps → Execution → Observation → Evaluation → Replanning**.
 - [ ] Integrar de forma realmente operacional `GoalEngine`, `Planner` e `Orchestrator`.
 - [ ] Substituir o replanning puramente hardcoded por decisões orientadas por contexto/LLM quando houver segurança para isso.
@@ -232,7 +260,7 @@ SERVER = control plane / source of truth. CORE = compute plane (Orchestrator, LL
 - [ ] Manter fallback entre modelos/providers sem inventar estado quando um provider falhar.
 - [ ] Metas de longa duração devem continuar usando o mesmo estado central do SERVER.
 
-### 🖱️ Fase 20: Computer Use Seguro
+### 🖱️ Fase 21: Computer Use Seguro
 - [ ] Captura de tela local.
 - [ ] Controle de mouse e teclado como fallback quando não houver API.
 - [ ] OCR/visão para compreender a interface.
@@ -246,7 +274,7 @@ SERVER = control plane / source of truth. CORE = compute plane (Orchestrator, LL
 - [ ] Evitar que screenshot, OCR ou visão sejam tratados como autorização.
 - [ ] Projetar compatibilidade com Windows Agent e com a futura visão multimodal.
 
-### 🧬 Fase 21: Self-Editing & Self-Evolution Seguro
+### 🧬 Fase 22: Self-Editing & Self-Evolution Seguro
 - [ ] JARVIS pode propor alterações no próprio código.
 - [ ] Sempre trabalhar em branch isolada.
 - [ ] Sandbox de edição e execução.
@@ -259,7 +287,7 @@ SERVER = control plane / source of truth. CORE = compute plane (Orchestrator, LL
 - [ ] Permitir evolução incremental, nunca substituir o sistema inteiro em uma única operação.
 - [ ] Self-editing deve usar as mesmas políticas de segurança e confirmação do restante do JARVIS.
 
-### 📊 Fase 22: Observabilidade, Benchmarks & Eficiência
+### 📊 Fase 23: Observabilidade, Benchmarks & Eficiência
 - [ ] Métricas de latência, tokens, falhas, retries e custo.
 - [ ] Saúde de providers e nós.
 - [ ] Rastreamento de tarefas e Goals longos.
@@ -271,7 +299,7 @@ SERVER = control plane / source of truth. CORE = compute plane (Orchestrator, LL
 - [ ] Incluir testes de regressão de streaming, gateway e comunicação distribuída.
 - [ ] A observabilidade deve preservar privacidade e nunca registrar secrets.
 
-### 🧩 Fase 23: Plugin System & Extensibilidade
+### 🧩 Fase 24: Plugin System & Extensibilidade
 - [ ] Sistema de extensões/plugins com contratos claros.
 - [ ] Descoberta e registro controlados.
 - [ ] Permissões por plugin.
@@ -281,7 +309,7 @@ SERVER = control plane / source of truth. CORE = compute plane (Orchestrator, LL
 - [ ] Nenhum plugin deve contornar `PolicyEngine`, `ToolVisibility` ou autenticação.
 - [ ] Plugins devem possuir ciclo de vida controlado e possibilidade de desativação.
 
-### 🔭 Fase 24: Multi-Modalidade Integrada
+### 🔭 Fase 25: Multi-Modalidade Integrada
 - [ ] Unificar texto, voz, visão e interfaces externas em um mesmo contexto de sessão.
 - [ ] Compartilhar memória, objetivos e estado entre modalidades.
 - [ ] Manter uma única autoridade de estado no SERVER.
