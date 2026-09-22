@@ -140,16 +140,16 @@ SERVER = control plane / source of truth. CORE = compute plane (Orchestrator, LL
 
 #### Validação operacional da Fase 12 (Concluída)
 
-1. Ligar o Ubuntu Server.
-2. Conferir/configurar manualmente o `.env` do SERVER, incluindo a credencial Gemini **somente no SERVER**.
-3. Iniciar/reiniciar o serviço JARVIS no Ubuntu.
-4. Verificar schema/migração da base central e saúde do SERVER.
-5. Iniciar o CORE Windows e confirmar registro + heartbeat no SERVER.
-6. Testar fluxo real **cliente → SERVER → CORE → Ollama → SERVER → cliente**.
-7. Testar fluxo **CORE → SERVER relay → Gemini → SERVER → CORE**, garantindo que a chave Gemini não exista no CORE.
-8. Testar conversação, memória e confirmations centralizadas.
-9. Testar `POST /api/chat/stream` real e comportamento em falha/desconexão.
-10. Confirmar logs, status dos dispositivos e ausência de secrets no Git.
+- [x] 1. Ligar o Ubuntu Server.
+- [x] 2. Conferir/configurar manualmente o `.env` do SERVER, incluindo a credencial Gemini **somente no SERVER**.
+- [x] 3. Iniciar/reiniciar o serviço JARVIS no Ubuntu.
+- [x] 4. Verificar schema/migração da base central e saúde do SERVER.
+- [x] 5. Iniciar o CORE Windows e confirmar registro + heartbeat no SERVER.
+- [x] 6. Testar fluxo real **cliente → SERVER → CORE → Ollama → SERVER → cliente**.
+- [x] 7. Testar fluxo **CORE → SERVER relay → Gemini → SERVER → CORE**, garantindo que a chave Gemini não exista no CORE.
+- [x] 8. Testar conversação, memória e confirmations centralizadas.
+- [x] 9. Testar `POST /api/chat/stream` real e comportamento em falha/desconexão.
+- [x] 10. Confirmar logs, status dos dispositivos e ausência de secrets no Git.
 
 **Não implementar nesta validação:** VPN/acesso externo, Home Assistant, voz, visão, Android ou novos bancos/filas.
 
@@ -166,7 +166,7 @@ SERVER = control plane / source of truth. CORE = compute plane (Orchestrator, LL
 - [ ] Observabilidade do acesso remoto sem criar dependência de exposição pública.
 - [ ] Não implementar até a Fase 12 estar validada localmente.
 
-## . 📞Fase 14: Telefonia & Agente de Chamadas
+## 📞Fase 14: Telefonia & Agente de Chamadas
 
 - [ ] Integrar um **número de telefone ao J.A.R.V.I.S.**, criando uma identidade telefônica própria para o agente.
 - [ ] Permitir que o J.A.R.V.I.S. **realize chamadas telefônicas de saída** a partir de instruções do usuário.
@@ -217,7 +217,6 @@ SERVER = control plane / source of truth. CORE = compute plane (Orchestrator, LL
 - [ ] Comunicação do S20 com o SERVER central.
 - [ ] Painel leve para tablet.
 - [ ] Avaliar Termux/Termux:API quando um agente local Android for realmente necessário.
-- [ ] Avaliar posteriormente um **canal telefônico/número próprio do JARVIS**, usando APIs oficiais e arquitetura separada.
 - [ ] Ações sensíveis no Android continuam passando pelo modelo de segurança do JARVIS.
 - [ ] O canal telefônico deve tratar identidade, autorização, logs e limites de uso antes de permitir ações reais.
 
