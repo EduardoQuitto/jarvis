@@ -153,11 +153,7 @@ SERVER = control plane / source of truth. CORE = compute plane (Orchestrator, LL
 
 **Não implementar nesta validação:** VPN/acesso externo, Home Assistant, voz, visão, Android ou novos bancos/filas.
 
----
-
-## Fases Futuras
-
-### 🔐 Fase 13: Acesso Externo Seguro
+### ✅ Fase 13: Acesso Externo Seguro
 - [x] Permitir uso do JARVIS fora de casa através de **rede privada/VPN**.
 - [x] SERVER permanece como único gateway da arquitetura.
 - [x] Não expor diretamente o CORE ou ferramentas sensíveis à internet pública.
@@ -165,6 +161,10 @@ SERVER = control plane / source of truth. CORE = compute plane (Orchestrator, LL
 - [x] Reconexão e disponibilidade quando a conexão externa cair.
 - [x] Observabilidade do acesso remoto sem criar dependência de exposição pública.
 - [x] Não implementar até a Fase 12 estar validada localmente.
+
+---
+
+## Fases Futuras
 
 ## 📞Fase 14: Telefonia & Agente de Chamadas
 
