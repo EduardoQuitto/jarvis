@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Phase 15 — Home Assistant integration (code implemented and tested; operational validation pending):**
+  - `HomeAssistantClient` (`core/home_assistant/`, httpx, Bearer token) with standardized errors (timeout/connection/401/404/429/5xx/invalid JSON); token never in errors, logs or payloads.
+  - Tools `home_assistant_get_state(s)` (GREEN/SHARED), `home_assistant_call_service` (YELLOW/SHARED, same confirmation path), `home_assistant_wake_on_lan` (GREEN/SHARED via `wake_on_lan.send_magic_packet`); registered only on SERVER role with HA enabled — CORE reaches them via `remote_server_tool`.
+  - `JARVIS_HOME_ASSISTANT_ENABLED/URL/TOKEN/TIMEOUT` settings (disabled by default); placeholders only in `.env.example`.
+  - `docs/HOME_ASSISTANT.md` (architecture, token setup, scenes/scripts/automations, WoL, troubleshooting) and `scripts/check_home_assistant.py` manual diagnostic (never prints the token).
 - **Phase 12 — Central Server & Central State Authority:**
   - `CentralStateClient` over `RemoteNodeClient` (conversations, memory, confirmations; explicit `CentralStateError`, nothing invented); `JARVIS_CENTRAL_STATE_ENABLED` (default off, local mode preserved) and `JARVIS_CENTRAL_STATE_REQUIRED` (explicit failure, no silent local fallback).
   - Central conversations API (`POST/GET /api/conversations[/{id}[/messages]]`) on the existing SQLite schema; `ConversationManager` accepts a central backend with identical tool-call sequence semantics.

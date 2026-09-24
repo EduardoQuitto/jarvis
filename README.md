@@ -26,6 +26,7 @@ It is **not** a cloud chatbot. It is a local intelligence layer that runs on you
 - **Intelligence Router**: Multi-provider fallback with circuit breaker; chain Ollama (local, primary) → Google Gemini (cloud) → mock, retry with backoff on transient cloud errors
 - **REST API**: FastAPI gateway with /health, /telemetry, /tools, /chat, /chat/stream (SSE), /internal/chat (compute-only), /mcp, /api/devices, /api/tasks, /api/memory, /api/conversations, /api/confirmations endpoints
 - **Central state**: SERVER SQLite is the source of truth (conversations, memory, confirmations, tasks, devices); CORE runs the Orchestrator/LLM and consumes state over HTTP
+- **Home Assistant** (Fase 15, SERVER-only): `home_assistant_get_state(s)` (GREEN), `home_assistant_call_service` (YELLOW), `home_assistant_wake_on_lan`; token lives only on the SERVER, CORE reaches them via `remote_server_tool`
 - **Orchestrator**: LLM-driven agentic loop with tool calling and confirmation flow (approved YELLOW/RED tools execute; failures reported honestly)
 - **Goal Engine**: High-level objective lifecycle (create/start/complete/fail/cancel) with replanning
 - **Agent System**: Specialized agent execution with immutable permissions, factory, registry, security validation
@@ -297,8 +298,8 @@ pytest -q --no-header -p no:cacheprovider
 pytest tests/unit/test_goal_engine.py -v
 ```
 
-**440 tests** across unit and integration suites (438 passing, 2 platform-skipped):
-- Unit tests: contracts, config, planner, memory, security, tools, router, agents, goals, bridge, presence, tasks, Google provider, retry, confirmation flow, streaming
+**465 tests** across unit and integration suites (463 passing, 2 platform-skipped):
+- Unit tests: contracts, config, planner, memory, security, tools, router, agents, goals, bridge, presence, tasks, Google provider, retry, confirmation flow, streaming, home_assistant
 - Integration tests: AI pipeline, E2E pipeline, multi-provider flow, goal-agent integration, mocked bridge/presence/task lifecycles
 
 The test database (`data/jarvis.db`) is **never touched** by tests. Each test runs in an isolated temporary directory.
@@ -329,7 +330,7 @@ The test database (`data/jarvis.db`) is **never touched** by tests. Each test ru
 2. Create a feature branch: `git checkout -b feature/my-change`
 3. Make your changes following the project's coding standards (see `docs/AGENTS.md`)
 4. Run the full test suite: `pytest -v`
-5. Ensure all collected tests pass with 0 failures (438 passed, 2 skipped on Windows without symlink privilege)
+5. Ensure all collected tests pass with 0 failures (463 passed, 2 skipped on Windows without symlink privilege)
 6. Commit your changes with a clear message
 7. Push and open a Pull Request
 

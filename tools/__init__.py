@@ -16,6 +16,13 @@ from tools.builtin.memory_tool import SearchMemoryTool
 from tools.builtin.internet_tool import WebSearchTool, FetchUrlTool
 from tools.builtin.task_tool import CreateTaskTool
 from tools.builtin.remote_tool import RemoteServerTool, register_remote_tool
+from tools.builtin.home_assistant import (
+    HomeAssistantGetStateTool,
+    HomeAssistantGetStatesTool,
+    HomeAssistantCallServiceTool,
+    HomeAssistantWakeOnLanTool,
+    register_home_assistant_tools,
+)
 
 
 def register_default_tools(registry: ToolRegistry) -> None:
@@ -24,6 +31,9 @@ def register_default_tools(registry: ToolRegistry) -> None:
     The CORE -> SERVER bridge tool (remote_server_tool) is registered only
     when JARVIS_SERVER_URL is configured; otherwise the system works exactly
     as before without errors.
+
+    Home Assistant tools execute only on SERVER nodes with HA enabled; the
+    CORE reaches them through remote_server_tool (never directly).
     """
     registry.register(EchoTool())
     registry.register(GetSystemMetricsTool())
@@ -40,6 +50,7 @@ def register_default_tools(registry: ToolRegistry) -> None:
     registry.register(FetchUrlTool())
     registry.register(CreateTaskTool())
     register_remote_tool(registry)
+    register_home_assistant_tools(registry)
 
 
 __all__ = [
@@ -64,4 +75,9 @@ __all__ = [
     "CreateTaskTool",
     "RemoteServerTool",
     "register_remote_tool",
+    "HomeAssistantGetStateTool",
+    "HomeAssistantGetStatesTool",
+    "HomeAssistantCallServiceTool",
+    "HomeAssistantWakeOnLanTool",
+    "register_home_assistant_tools",
 ]

@@ -61,11 +61,14 @@ def _manager(stub=None, **overrides):
 # --- configuration ---
 
 def test_presence_config_defaults(monkeypatch):
+    # _env_file=None ignores the developer's real .env, so this test
+    # verifies the true code defaults (delenv alone cannot do that when
+    # dotenv defines the variables).
     monkeypatch.delenv("JARVIS_SERVER_HEARTBEAT_INTERVAL", raising=False)
     monkeypatch.delenv("JARVIS_NODE_ADVERTISE_IP", raising=False)
     monkeypatch.delenv("JARVIS_NODE_ADVERTISE_PORT", raising=False)
-    reset_settings()
-    settings = get_settings()
+    from core.config import Settings
+    settings = Settings(_env_file=None)
     assert settings.server_heartbeat_interval == 30.0
     assert settings.node_advertise_ip == ""
     assert settings.node_advertise_port == 0
@@ -93,6 +96,10 @@ def test_presence_identity_and_version(monkeypatch):
 
 def test_presence_advertise_ip_port_optional(monkeypatch):
     monkeypatch.setenv("JARVIS_SERVER_URL", "http://testserver")
+    # Explicit empty strings = not announced. (delenv alone is not enough:
+    # a real .env may define these via dotenv.)
+    monkeypatch.setenv("JARVIS_NODE_ADVERTISE_IP", "")
+    monkeypatch.setenv("JARVIS_NODE_ADVERTISE_PORT", "0")
     reset_settings()
     # Defaults: nothing announced (no inbound endpoint invented)
     manager = NodePresenceManager.from_settings(client=_StubClient())

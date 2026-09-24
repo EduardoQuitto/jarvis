@@ -182,13 +182,16 @@ Acesso externo (fora de casa) continua futuro e não implementado: quando existi
 - [ ] Observabilidade do acesso remoto sem criar dependência de exposição pública.
 - [ ] Não implementar até a Fase 12 estar validada localmente.
 
-### 🏠 Fase 14: Integração Home Assistant
-- [ ] Home Assistant como backbone de automação doméstica.
+### 🏠 Fase 14: Integração Home Assistant (código implementado e testado; validação operacional pendente)
+- [x] Home Assistant como backbone de automação doméstica (`core/home_assistant/`, token somente no SERVER).
+- [x] Tools SHARED via remote bridge: `home_assistant_get_state(s)` (GREEN), `home_assistant_call_service` (YELLOW), `home_assistant_wake_on_lan` (GREEN); registradas só com role SERVER + HA habilitado.
+- [x] Wake-on-LAN para acordar o CORE quando necessário (`wake_on_lan.send_magic_packet`).
+- [x] Controle de dispositivos e cenas (scenes/scripts/automations via `call_service`, sem scheduler próprio).
+- [x] SERVER continua leve; processamento pesado permanece no CORE.
+- [x] Integração respeita o mesmo modelo central de identidade, estado e autorização (PolicyEngine/ConfirmationManager inalterados).
+- [x] Documentação (`docs/HOME_ASSISTANT.md`) e script de diagnóstico (`scripts/check_home_assistant.py`).
 - [ ] Scheduler e automações no SERVER.
-- [ ] Wake-on-LAN para acordar o CORE quando necessário.
-- [ ] Controle de dispositivos e cenas.
-- [ ] SERVER continua leve; processamento pesado permanece no CORE.
-- [ ] Integração deve respeitar o mesmo modelo central de identidade, estado e autorização.
+- [ ] Validação operacional com Home Assistant real instalado/configurado.
 
 ### 🎙️ Fase 15: Pipeline de Voz Local
 - [ ] Wake Word.
