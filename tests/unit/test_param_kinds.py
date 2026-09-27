@@ -99,17 +99,21 @@ async def test_file_tools_accept_parens_end_to_end(tmp_path):
     from tools.builtin.file_tool import ReadFileTool, WriteFileTool, ListDirTool
 
     settings = SimpleNamespace(allowed_apps={}, allowed_paths=[str(tmp_path)])
-    registry = ToolRegistry()
-    registry.register(ReadFileTool())
-    registry.register(WriteFileTool())
-    registry.register(ListDirTool())
-
     content = "custo R$ 10 & frete (grátis)\nlinha 2"
     rel_path = "dir (test)/a (b).txt"
     target = tmp_path / rel_path
     target.parent.mkdir(parents=True, exist_ok=True)
 
     with patch("security.allowlist.get_settings", return_value=settings):
+        # Registry (and its PolicyEngine/AllowlistValidator) must be built
+        # INSIDE the patch: the validator snapshots get_settings() at
+        # construction, so building it outside would keep the global
+        # allowed_paths and break with basetemps outside the user profile.
+        registry = ToolRegistry()
+        registry.register(ReadFileTool())
+        registry.register(WriteFileTool())
+        registry.register(ListDirTool())
+
         written = await registry.execute_tool(
             "write_file",
             {"file_path": str(target), "content": content},
