@@ -90,8 +90,10 @@ def test_presence_identity_and_version(monkeypatch):
     assert manager._device_type == "CORE"
     assert manager._capabilities == ["llm"]
     assert manager._name == "J.A.R.V.I.S. Core - i5-14400"
-    assert manager._version == "0.5.0"
-    assert project_version() == "0.5.0"
+    # Wired to the real project version (not pinned: must survive bumps).
+    assert manager._version == project_version()
+    import re
+    assert re.fullmatch(r"\d+\.\d+\.\d+", project_version())
 
 
 def test_presence_advertise_ip_port_optional(monkeypatch):

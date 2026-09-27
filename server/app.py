@@ -67,7 +67,7 @@ def create_app() -> FastAPI:
 
     app = FastAPI(
         title="J.A.R.V.I.S. Node API",
-        version="0.5.0",
+        version="0.6.0",
         description="Distributed modular interface for JARVIS system and node automation.",
         debug=settings.debug,
         lifespan=lifespan,

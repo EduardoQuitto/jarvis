@@ -2,7 +2,7 @@
 
 [![Python 3.13+](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-230%20passing-brightgreen.svg)](#testing)
+[![Tests](https://img.shields.io/badge/tests-463%20passing-brightgreen.svg)](#testing)
 [![Architecture](https://img.shields.io/badge/architecture-modular%20%26%20distributed-green.svg)](#architecture)
 
 J.A.R.V.I.S. is a local, modular, distributed personal AI assistant built with security, portability, and hardware decoupling as core principles.
@@ -13,7 +13,7 @@ It is **not** a cloud chatbot. It is a local intelligence layer that runs on you
 
 ## Current Status
 
-**Phase 10 complete** (Security & Execution Boundary Hardening), operational CORE ↔ SERVER bridge, **Fase 11 complete** (real-time SSE streaming via `POST /api/chat/stream`) and **Fase 12 complete** (Central Server & Central State Authority: SERVER = gateway + source of truth, CORE = compute plane; Gemini key lives only on the SERVER relay).
+**v0.6.0** (current) — **Phase 10 complete** (Security & Execution Boundary Hardening), operational CORE ↔ SERVER bridge, **Fase 11 complete** (real-time SSE streaming), **Fase 12 complete** (Central Server & Central State Authority: SERVER = gateway + source of truth, CORE = compute plane; Gemini key lives only on the SERVER relay) and **Fase 15 complete** (Home Assistant SERVER-only integration, validated against a real server with Google Home voice control).
 
 ### Implemented
 
@@ -26,7 +26,7 @@ It is **not** a cloud chatbot. It is a local intelligence layer that runs on you
 - **Intelligence Router**: Multi-provider fallback with circuit breaker; chain Ollama (local, primary) → Google Gemini (cloud) → mock, retry with backoff on transient cloud errors
 - **REST API**: FastAPI gateway with /health, /telemetry, /tools, /chat, /chat/stream (SSE), /internal/chat (compute-only), /mcp, /api/devices, /api/tasks, /api/memory, /api/conversations, /api/confirmations endpoints
 - **Central state**: SERVER SQLite is the source of truth (conversations, memory, confirmations, tasks, devices); CORE runs the Orchestrator/LLM and consumes state over HTTP
-- **Home Assistant** (Fase 15, SERVER-only): `home_assistant_get_state(s)` (GREEN), `home_assistant_call_service` (YELLOW), `home_assistant_wake_on_lan`; token lives only on the SERVER, CORE reaches them via `remote_server_tool`
+- **Home Assistant** (Fase 15, SERVER-only, validated): `home_assistant_get_state(s)` (GREEN), `home_assistant_call_service` (YELLOW), `home_assistant_wake_on_lan`; token lives only on the SERVER, CORE reaches them via `remote_server_tool`; Google Home controls a real `input_boolean` through Tailscale Funnel (see `docs/HOME_ASSISTANT.md`)
 - **Orchestrator**: LLM-driven agentic loop with tool calling and confirmation flow (approved YELLOW/RED tools execute; failures reported honestly)
 - **Goal Engine**: High-level objective lifecycle (create/start/complete/fail/cancel) with replanning
 - **Agent System**: Specialized agent execution with immutable permissions, factory, registry, security validation
@@ -39,7 +39,7 @@ It is **not** a cloud chatbot. It is a local intelligence layer that runs on you
 
 ### Planned (Not Yet Implemented)
 
-- **Home Assistant integration** (scheduler, automations, Wake-on-LAN)
+- **Home Assistant scheduler/automations on SERVER** (integration itself is done — Fase 15; server-side scheduling remains future work)
 - **Voice pipeline** (Wake Word -> VAD -> STT -> TTS)
 - **Android/Tablet dashboard** (Home Assistant Companion + lightweight HTML panel)
 - **Computer Vision** (screenshot, OCR, visual analysis)

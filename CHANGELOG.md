@@ -5,14 +5,17 @@ All notable changes to the J.A.R.V.I.S. project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.6.0] - 2026-09-27
 
 ### Added
-- **Phase 15 — Home Assistant integration (code implemented and tested; operational validation pending):**
+- **Phase 15 — Home Assistant integration (concluded and operationally validated):**
   - `HomeAssistantClient` (`core/home_assistant/`, httpx, Bearer token) with standardized errors (timeout/connection/401/404/429/5xx/invalid JSON); token never in errors, logs or payloads.
   - Tools `home_assistant_get_state(s)` (GREEN/SHARED), `home_assistant_call_service` (YELLOW/SHARED, same confirmation path), `home_assistant_wake_on_lan` (GREEN/SHARED via `wake_on_lan.send_magic_packet`); registered only on SERVER role with HA enabled — CORE reaches them via `remote_server_tool`.
   - `JARVIS_HOME_ASSISTANT_ENABLED/URL/TOKEN/TIMEOUT` settings (disabled by default); placeholders only in `.env.example`.
-  - `docs/HOME_ASSISTANT.md` (architecture, token setup, scenes/scripts/automations, WoL, troubleshooting) and `scripts/check_home_assistant.py` manual diagnostic (never prints the token).
+  - `docs/HOME_ASSISTANT.md` (architecture, token setup, scenes/scripts/automations, WoL, Docker, Google Home, troubleshooting) and `scripts/check_home_assistant.py` manual diagnostic (never prints the token).
+  - Docker persistence: `homeassistant-test` (`ghcr.io/home-assistant/home-assistant:2026.6.4`, restart `unless-stopped`, config in `/opt/homeassistant-test`) survives container restarts with auth and states intact.
+  - Google Home integration: Developer Console project `jarvis-home-assistant-0b396` with OAuth + Cloud Fulfillment via Tailscale Funnel (`https://jarvisserver.tail5523ce.ts.net/api/google_assistant`; HTTP 405 on plain GET is expected); helper `JARVIS Teste` (`input_boolean`) voice-controlled end to end; Service Account key only on the SERVER (`/opt/homeassistant-test/SERVICE_ACCOUNT.json`, `root:root`, `600`).
+  - Tailscale Funnel as the public HTTPS path to Home Assistant (no router port-forward; JARVIS `:8000` never exposed).
 - **Phase 12 — Central Server & Central State Authority:**
   - `CentralStateClient` over `RemoteNodeClient` (conversations, memory, confirmations; explicit `CentralStateError`, nothing invented); `JARVIS_CENTRAL_STATE_ENABLED` (default off, local mode preserved) and `JARVIS_CENTRAL_STATE_REQUIRED` (explicit failure, no silent local fallback).
   - Central conversations API (`POST/GET /api/conversations[/{id}[/messages]]`) on the existing SQLite schema; `ConversationManager` accepts a central backend with identical tool-call sequence semantics.
@@ -39,7 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **ExternalProvider resilience:** limited retry with exponential backoff (3 attempts, ~1s/~2s via `asyncio.sleep`) for transient HTTP 408/429/500/502/503/504 in `generate()`; permanent 4xx never retry; `LLMResponse(error_msg=...)`
 contract preserved; streaming failures propagate (no fake success chunks) so `route_stream()` falls back before any
 content and re-raises after content was emitted instead of mixing providers.
-- Tests: 103 new tests (333 total) covering bridge, presence, lifespan, task lifecycle, Google slot, retry/backoff, and the confirmation flow below.
+- Tests: 465 collected, 463 passing, 0 failed, 2 skipped (Windows symlink privilege) covering bridge, presence, lifespan, task lifecycle, Google slot, retry/backoff, confirmation flow and Home Assistant.
 
 ### Changed
 - `server/routers/tasks.py`: `PATCH .../tasks/{id}` with `error` now appends to the `errors` history (previously wrote a nonexistent `error` column → HTTP 500); create accepts optional `conversation_id`.
@@ -50,9 +53,15 @@ content and re-raises after content was emitted instead of mixing providers.
 ### Fixed
 - **Confirmation flow:** approved YELLOW/RED tools were denied again on resume (`operator_direct` never propagated) and failures were masked as "Action completed.". Resume now propagates the consumed approval and reports failures honestly. Covered by `test_orchestrator_confirmation.py`.
 - Symlink sandbox tests skip conditionally on Windows without privilege (WinError 1314) instead of failing.
+- File sandbox test isolation in `test_param_kinds.py`: `ToolRegistry()` and tool registrations now happen inside the `get_settings` patch context so the mocked `allowed_paths` apply regardless of the pytest temp directory.
 
 ### Security
 - No new routes, no remote shell, no arbitrary execution; cloud providers only ever see SHARED tools; API keys never logged/printed/committed.
+
+### Validation
+- 465 tests collected, 463 passed, 0 failed, 2 skipped; `compileall` clean; `git diff --check` clean.
+- Home Assistant operational on the SERVER (Docker persistent, 20 entities via health check, Jarvis re-authenticates after container restart).
+- Google Home controlling the `JARVIS Teste` helper by voice (OnOff command observed in Home Assistant).
 
 ## [0.5.0] - 2026-08-25
 

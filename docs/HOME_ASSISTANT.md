@@ -1,5 +1,9 @@
 # J.A.R.V.I.S. — Integração Home Assistant (Fase 15)
 
+> **Status: concluída e validada operacionalmente** no SERVER Ubuntu real
+> (Docker persistente + Google Home controlando entidade de teste por voz).
+> Versão do projeto: **v0.6.0**.
+
 ## Arquitetura
 
 ```text
@@ -30,7 +34,17 @@ NÃO cria scheduler próprio.
 Qualquer instalação com a HTTP API habilitada serve (HA OS, Container ou
 Core). Anote o endereço LAN do servidor, por exemplo
 `http://192.168.0.13:8123` (pode coexistir na mesma máquina do JARVIS SERVER,
-emContainer Docker separado — sem dependências novas no repo).
+em container Docker separado — sem dependências novas no repo).
+
+## Instalação validada (Docker, SERVER Ubuntu)
+
+- Docker instalado e validado com `hello-world`.
+- Container `homeassistant-test`, imagem
+  `ghcr.io/home-assistant/home-assistant:2026.6.4`, porta `8123`, config em
+  `/opt/homeassistant-test`, restart policy `unless-stopped`.
+- Restart do container validado: Home Assistant volta, endpoint externo
+  volta, JARVIS autentica de novo e os estados continuam acessíveis
+  (persistência comprovada).
 
 ## Configuração
 
@@ -122,6 +136,46 @@ python scripts/check_home_assistant.py --states   # + leitura de estados
 ```
 
 O script nunca exibe o token e retorna exit code ≠ 0 em falha.
+
+Resultado validado no SERVER (após restart do container):
+
+```text
+Home Assistant configuration: OK
+Authentication: OK
+API: OK
+States: OK (20 entities)
+```
+
+A consulta continuou funcionando depois do restart, comprovando persistência.
+
+## Google Home (validação funcional real)
+
+- Projeto no Google Home Developer Console: ID `jarvis-home-assistant-0b396`,
+  integração `JARVIS Home Assistant`, com OAuth e Cloud Fulfillment via
+  **Tailscale Funnel**: `https://jarvisserver.tail5523ce.ts.net/api/google_assistant`
+  (um GET comum retorna HTTP 405 — esperado, o endpoint só aceita as operações
+  apropriadas; 405 não é erro aqui).
+- Helper `JARVIS Teste` (`input_boolean`) exposto aos assistentes de voz:
+  comando de voz ligou a entidade e o Home Assistant registrou
+  "JARVIS Teste ligado acionado por Google Assistant sent command OnOff".
+- Fluxo comprovado: Google Home → Google Assistant → Tailscale Funnel →
+  Home Assistant → entidade.
+- Service Account da integração instalada **somente no SERVER** em
+  `/opt/homeassistant-test/SERVICE_ACCOUNT.json` (permissões `root:root`,
+  `600`); a cópia temporária em `/tmp` foi removida. Nunca commitar chaves
+  (conteúdo fora do Git por regra permanente).
+- `configuration.yaml` validado (`check_config` sem erros), incluindo
+  `google_assistant` e o trust de reverse proxy:
+  `http.use_x_forwarded_for: true` + `trusted_proxies: [172.17.0.1]`.
+
+## Tailscale Funnel (acesso externo à HA, não ao JARVIS)
+
+- O Funnel encaminha `https://jarvisserver.tail5523ce.ts.net/` para
+  `http://127.0.0.1:8123`. Isso é um endpoint **público via HTTPS** (não
+  acesso privado à tailnet), sem port forwarding no roteador.
+- A arquitetura continua protegendo o JARVIS: SERVER → Home Assistant via
+  rede local; Google Home → HTTPS público → Funnel → Home Assistant.
+- **Nunca expor a porta 8000 do JARVIS publicamente.**
 
 ## Troubleshooting
 

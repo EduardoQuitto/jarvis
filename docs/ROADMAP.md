@@ -182,7 +182,10 @@ Acesso externo (fora de casa) continua futuro e não implementado: quando existi
 - [ ] Observabilidade do acesso remoto sem criar dependência de exposição pública.
 - [ ] Não implementar até a Fase 12 estar validada localmente.
 
-### 🏠 Fase 14: Integração Home Assistant (código implementado e testado; validação operacional pendente)
+### Fase 14: Telefonia (intencionalmente pulada no histórico)
+- A numeração histórica do projeto pula a Fase 14 (telefonia/calls), deliberadamente em espera; a sequência continua na Fase 15. Nada dessa fase foi implementado ou marcado como concluído.
+
+### 🏠 Fase 15: Integração Home Assistant (Concluída)
 - [x] Home Assistant como backbone de automação doméstica (`core/home_assistant/`, token somente no SERVER).
 - [x] Tools SHARED via remote bridge: `home_assistant_get_state(s)` (GREEN), `home_assistant_call_service` (YELLOW), `home_assistant_wake_on_lan` (GREEN); registradas só com role SERVER + HA habilitado.
 - [x] Wake-on-LAN para acordar o CORE quando necessário (`wake_on_lan.send_magic_packet`).
@@ -190,10 +193,10 @@ Acesso externo (fora de casa) continua futuro e não implementado: quando existi
 - [x] SERVER continua leve; processamento pesado permanece no CORE.
 - [x] Integração respeita o mesmo modelo central de identidade, estado e autorização (PolicyEngine/ConfirmationManager inalterados).
 - [x] Documentação (`docs/HOME_ASSISTANT.md`) e script de diagnóstico (`scripts/check_home_assistant.py`).
-- [ ] Scheduler e automações no SERVER.
-- [ ] Validação operacional com Home Assistant real instalado/configurado.
+- [x] Scheduler e automações via Home Assistant (acionamento por `call_service`; sem scheduler próprio em Python).
+- [x] Validação operacional: Docker `homeassistant-test` (imagem 2026.6.4, restart `unless-stopped`, persistente após restart), `scripts/check_home_assistant.py` (health/auth/20 entities), Google Home controlando o helper `JARVIS Teste` por voz via Tailscale Funnel (405 em GET esperado).
 
-### 🎙️ Fase 15: Pipeline de Voz Local
+### 🎙️ Fase 16: Pipeline de Voz Local (Próxima)
 - [ ] Wake Word.
 - [ ] VAD (detecção de atividade de voz).
 - [ ] STT local, inicialmente com Whisper ou alternativa equivalente.
@@ -202,7 +205,7 @@ Acesso externo (fora de casa) continua futuro e não implementado: quando existi
 - [ ] Voz deve utilizar o mesmo JARVIS central, memória, Goals e segurança.
 - [ ] Não criar uma segunda inteligência paralela.
 
-### 📱 Fase 16: Android & Tablet Dashboard
+### 📱 Fase 17: Android & Tablet Dashboard
 - [ ] Priorizar Home Assistant Companion e/ou ADB para integração Android.
 - [ ] Telemetria, notificações, câmera, microfone e sensores.
 - [ ] Comunicação do S20 com o SERVER central.
@@ -212,16 +215,16 @@ Acesso externo (fora de casa) continua futuro e não implementado: quando existi
 - [ ] Ações sensíveis no Android continuam passando pelo modelo de segurança do JARVIS.
 - [ ] O canal telefônico deve tratar identidade, autorização, logs e limites de uso antes de permitir ações reais.
 
-### 👁️ Fase 17: Visão Computacional
+### 👁️ Fase 18: Visão Computacional
 - [ ] Captura de tela.
 - [ ] OCR quando necessário.
 - [ ] Análise visual local.
 - [ ] Integração com o contexto do Orchestrator.
 - [ ] Separar percepção visual de planejamento e execução.
 - [ ] A percepção visual nunca deve conceder autorização automaticamente.
-- [ ] Preparar a base necessária para Computer Use da Fase 20.
+- [ ] Preparar a base necessária para Computer Use da Fase 21.
 
-### 🧠 Fase 18: Memória Vetorial & Busca Semântica
+### 🧠 Fase 19: Memória Vetorial & Busca Semântica
 - [ ] Adicionar embeddings locais e busca semântica.
 - [ ] Integrar a busca semântica à **memória central já existente**.
 - [ ] SERVER continua sendo a autoridade do estado persistente.
@@ -232,7 +235,7 @@ Acesso externo (fora de casa) continua futuro e não implementado: quando existi
 - [ ] Definir política de retenção, indexação, atualização e exclusão.
 - [ ] Recuperação semântica deve respeitar permissões e isolamento de dados.
 
-### 🤖 Fase 19: Autonomia Progressiva & Goal-Driven Intelligence
+### 🤖 Fase 20: Autonomia Progressiva & Goal-Driven Intelligence
 - [ ] Evoluir o fluxo **Goal → Plan → Steps → Execution → Observation → Evaluation → Replanning**.
 - [ ] Integrar de forma realmente operacional `GoalEngine`, `Planner` e `Orchestrator`.
 - [ ] Substituir o replanning puramente hardcoded por decisões orientadas por contexto/LLM quando houver segurança para isso.
@@ -251,7 +254,7 @@ Acesso externo (fora de casa) continua futuro e não implementado: quando existi
 - [ ] Manter fallback entre modelos/providers sem inventar estado quando um provider falhar.
 - [ ] Metas de longa duração devem continuar usando o mesmo estado central do SERVER.
 
-### 🖱️ Fase 20: Computer Use Seguro
+### 🖱️ Fase 21: Computer Use Seguro
 - [ ] Captura de tela local.
 - [ ] Controle de mouse e teclado como fallback quando não houver API.
 - [ ] OCR/visão para compreender a interface.
@@ -265,7 +268,7 @@ Acesso externo (fora de casa) continua futuro e não implementado: quando existi
 - [ ] Evitar que screenshot, OCR ou visão sejam tratados como autorização.
 - [ ] Projetar compatibilidade com Windows Agent e com a futura visão multimodal.
 
-### 🧬 Fase 21: Self-Editing & Self-Evolution Seguro
+### 🧬 Fase 22: Self-Editing & Self-Evolution Seguro
 - [ ] JARVIS pode propor alterações no próprio código.
 - [ ] Sempre trabalhar em branch isolada.
 - [ ] Sandbox de edição e execução.
@@ -278,7 +281,7 @@ Acesso externo (fora de casa) continua futuro e não implementado: quando existi
 - [ ] Permitir evolução incremental, nunca substituir o sistema inteiro em uma única operação.
 - [ ] Self-editing deve usar as mesmas políticas de segurança e confirmação do restante do JARVIS.
 
-### 📊 Fase 22: Observabilidade, Benchmarks & Eficiência
+### 📊 Fase 23: Observabilidade, Benchmarks & Eficiência
 - [ ] Métricas de latência, tokens, falhas, retries e custo.
 - [ ] Saúde de providers e nós.
 - [ ] Rastreamento de tarefas e Goals longos.
@@ -290,7 +293,7 @@ Acesso externo (fora de casa) continua futuro e não implementado: quando existi
 - [ ] Incluir testes de regressão de streaming, gateway e comunicação distribuída.
 - [ ] A observabilidade deve preservar privacidade e nunca registrar secrets.
 
-### 🧩 Fase 23: Plugin System & Extensibilidade
+### 🧩 Fase 24: Plugin System & Extensibilidade
 - [ ] Sistema de extensões/plugins com contratos claros.
 - [ ] Descoberta e registro controlados.
 - [ ] Permissões por plugin.
@@ -300,7 +303,7 @@ Acesso externo (fora de casa) continua futuro e não implementado: quando existi
 - [ ] Nenhum plugin deve contornar `PolicyEngine`, `ToolVisibility` ou autenticação.
 - [ ] Plugins devem possuir ciclo de vida controlado e possibilidade de desativação.
 
-### 🔭 Fase 24: Multi-Modalidade Integrada
+### 🔭 Fase 25: Multi-Modalidade Integrada
 - [ ] Unificar texto, voz, visão e interfaces externas em um mesmo contexto de sessão.
 - [ ] Compartilhar memória, objetivos e estado entre modalidades.
 - [ ] Manter uma única autoridade de estado no SERVER.
