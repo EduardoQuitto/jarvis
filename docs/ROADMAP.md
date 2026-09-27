@@ -164,7 +164,7 @@ Acesso externo (fora de casa) continua futuro e não implementado: quando existi
 - [x] Observabilidade do acesso remoto sem criar dependência de exposição pública.
 - [x] Não implementar até a Fase 12 estar validada localmente.
 
-### 🏠 Fase 15: Integração Home Assistant (Concluída)
+### ✅ Fase 15: Integração Home Assistant (Concluída)
 - [x] Home Assistant como backbone de automação doméstica (`core/home_assistant/`, token somente no SERVER).
 - [x] Tools SHARED via remote bridge: `home_assistant_get_state(s)` (GREEN), `home_assistant_call_service` (YELLOW), `home_assistant_wake_on_lan` (GREEN); registradas só com role SERVER + HA habilitado.
 - [x] Wake-on-LAN para acordar o CORE quando necessário (`wake_on_lan.send_magic_packet`).
