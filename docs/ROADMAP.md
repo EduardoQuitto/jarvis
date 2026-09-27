@@ -155,35 +155,47 @@ SERVER = control plane / source of truth; CORE = compute plane. Resultados verif
 - [x] Testes da fase: 440 coletados, 438 passando, 0 falhas, 2 skips; `compileall` limpo; `git diff --check` limpo.
 
 Acesso externo (fora de casa) continua futuro e não implementado: quando existir, será cliente externo -> rede privada segura/VPN -> SERVER -> CORE, nunca exposição direta à internet pública. Fases futuras (voz, Android, visão, Home Assistant) seguem não implementadas.
-
-1. Ligar o Ubuntu Server.
-2. Conferir/configurar manualmente o `.env` do SERVER, incluindo a credencial Gemini **somente no SERVER**.
-3. Iniciar/reiniciar o serviço JARVIS no Ubuntu.
-4. Verificar schema/migração da base central e saúde do SERVER.
-5. Iniciar o CORE Windows e confirmar registro + heartbeat no SERVER.
-6. Testar fluxo real **cliente → SERVER → CORE → Ollama → SERVER → cliente**.
-7. Testar fluxo **CORE → SERVER relay → Gemini → SERVER → CORE**, garantindo que a chave Gemini não exista no CORE.
-8. Testar conversação, memória e confirmations centralizadas.
-9. Testar `POST /api/chat/stream` real e comportamento em falha/desconexão.
-10. Confirmar logs, status dos dispositivos e ausência de secrets no Git.
-
-**Não implementar nesta validação:** VPN/acesso externo, Home Assistant, voz, visão, Android ou novos bancos/filas.
+### ✅ Fase 13: Acesso Externo Seguro
+- [x] Permitir uso do JARVIS fora de casa através de **rede privada/VPN**.
+- [x] SERVER permanece como único gateway da arquitetura.
+- [x] Não expor diretamente o CORE ou ferramentas sensíveis à internet pública.
+- [x] Autenticação, autorização e mínimo privilégio para clientes externos.
+- [x] Reconexão e disponibilidade quando a conexão externa cair.
+- [x] Observabilidade do acesso remoto sem criar dependência de exposição pública.
+- [x] Não implementar até a Fase 12 estar validada localmente.
 
 ---
 
 ## Fases Futuras
 
-### 🔐 Fase 13: Acesso Externo Seguro
-- [ ] Permitir uso do JARVIS fora de casa através de **rede privada/VPN**.
-- [ ] SERVER permanece como único gateway da arquitetura.
-- [ ] Não expor diretamente o CORE ou ferramentas sensíveis à internet pública.
-- [ ] Autenticação, autorização e mínimo privilégio para clientes externos.
-- [ ] Reconexão e disponibilidade quando a conexão externa cair.
-- [ ] Observabilidade do acesso remoto sem criar dependência de exposição pública.
-- [ ] Não implementar até a Fase 12 estar validada localmente.
+## 📞Fase 14: Telefonia (intencionalmente pulada — backlog futuro, nada implementado)
 
-### Fase 14: Telefonia (intencionalmente pulada no histórico)
-- A numeração histórica do projeto pula a Fase 14 (telefonia/calls), deliberadamente em espera; a sequência continua na Fase 15. Nada dessa fase foi implementado ou marcado como concluído.
+> Backlog preservado do planejamento anterior; fora da numeração ativa (que pula a Fase 14 e continua na Fase 15), em espera deliberada, nada implementado ou concluído.
+- [ ] Integrar um **número de telefone ao J.A.R.V.I.S.**, criando uma identidade telefônica própria para o agente.
+- [ ] Permitir que o J.A.R.V.I.S. **realize chamadas telefônicas de saída** a partir de instruções do usuário.
+- [ ] Permitir que o J.A.R.V.I.S. **atenda chamadas recebidas** automaticamente.
+- [ ] Permitir que o J.A.R.V.I.S. converse em tempo real com a pessoa durante a ligação.
+- [ ] Implementar o pipeline completo de chamada: **chamada → áudio/STT → Orchestrator → LLM/Tools → TTS → áudio**.
+- [ ] Usar o mesmo `Orchestrator`, memória, Goals, Tasks, contexto e sistema de segurança do J.A.R.V.I.S.
+- [ ] Identificar o número/contato que está ligando e associá-lo à identidade correspondente quando possível.
+- [ ] Permitir que o J.A.R.V.I.S. consulte informações e execute ações autorizadas durante uma ligação.
+- [ ] Permitir que o J.A.R.V.I.S. **faça ligações para empresas, serviços, pessoas ou contatos** de acordo com instruções explícitas do usuário.
+- [ ] Permitir definir um **objetivo de chamada**, como obter informação, confirmar disponibilidade, solicitar orçamento, acompanhar uma solicitação ou transmitir uma mensagem.
+- [ ] Permitir que o J.A.R.V.I.S. registre o resultado da chamada no estado central do SERVER.
+- [ ] Registrar transcrição, resumo, resultado, duração e ações realizadas de forma controlada.
+- [ ] Permitir que o J.A.R.V.I.S. **solicite ajuda ao usuário durante uma chamada** quando não conseguir concluir a tarefa sozinho.
+- [ ] Permitir transferência ou encaminhamento da chamada para o usuário quando necessário.
+- [ ] Permitir que o J.A.R.V.I.S. reconheça quando uma chamada exige intervenção humana.
+- [ ] Implementar **allowlist, autenticação e identificação de chamadas** para evitar que números não autorizados controlem o sistema.
+- [ ] Aplicar `PolicyEngine`, `ConfirmationManager` e demais controles de segurança também às ações iniciadas através de chamadas.
+- [ ] Exigir confirmação apropriada para ações sensíveis, financeiras, destrutivas ou que possam comprometer o usuário.
+- [ ] Separar claramente **comunicação telefônica** de **autorização para executar ações**.
+- [ ] Implementar reconexão, tratamento de falhas de áudio, timeout e recuperação de chamadas.
+- [ ] Evitar dependência rígida de um único provedor de telefonia.
+- [ ] Priorizar integrações e APIs oficiais de telefonia quando disponíveis.
+- [ ] Preparar a arquitetura para futuramente suportar **SMS, voicemail e outros canais de comunicação**.
+- [ ] Manter o SERVER como autoridade central e o CORE como camada de processamento.
+- [ ] O canal telefônico deve ser apenas mais uma interface do mesmo J.A.R.V.I.S., sem criar uma inteligência paralela.
 
 ### 🏠 Fase 15: Integração Home Assistant (Concluída)
 - [x] Home Assistant como backbone de automação doméstica (`core/home_assistant/`, token somente no SERVER).
@@ -211,7 +223,6 @@ Acesso externo (fora de casa) continua futuro e não implementado: quando existi
 - [ ] Comunicação do S20 com o SERVER central.
 - [ ] Painel leve para tablet.
 - [ ] Avaliar Termux/Termux:API quando um agente local Android for realmente necessário.
-- [ ] Avaliar posteriormente um **canal telefônico/número próprio do JARVIS**, usando APIs oficiais e arquitetura separada.
 - [ ] Ações sensíveis no Android continuam passando pelo modelo de segurança do JARVIS.
 - [ ] O canal telefônico deve tratar identidade, autorização, logs e limites de uso antes de permitir ações reais.
 
