@@ -164,6 +164,18 @@ Acesso externo (fora de casa) continua futuro e não implementado: quando existi
 - [x] Observabilidade do acesso remoto sem criar dependência de exposição pública.
 - [x] Não implementar até a Fase 12 estar validada localmente.
 
+### 🏠 Fase 15: Integração Home Assistant (Concluída)
+- [x] Home Assistant como backbone de automação doméstica (`core/home_assistant/`, token somente no SERVER).
+- [x] Tools SHARED via remote bridge: `home_assistant_get_state(s)` (GREEN), `home_assistant_call_service` (YELLOW), `home_assistant_wake_on_lan` (GREEN); registradas só com role SERVER + HA habilitado.
+- [x] Wake-on-LAN para acordar o CORE quando necessário (`wake_on_lan.send_magic_packet`).
+- [x] Controle de dispositivos e cenas (scenes/scripts/automations via `call_service`, sem scheduler próprio).
+- [x] SERVER continua leve; processamento pesado permanece no CORE.
+- [x] Integração respeita o mesmo modelo central de identidade, estado e autorização (PolicyEngine/ConfirmationManager inalterados).
+- [x] Documentação (`docs/HOME_ASSISTANT.md`) e script de diagnóstico (`scripts/check_home_assistant.py`).
+- [x] Scheduler e automações via Home Assistant (acionamento por `call_service`; sem scheduler próprio em Python).
+- [x] Validação operacional: Docker `homeassistant-test` (imagem 2026.6.4, restart `unless-stopped`, persistente após restart), `scripts/check_home_assistant.py` (health/auth/20 entities), Google Home controlando o helper `JARVIS Teste` por voz via Tailscale Funnel (405 em GET esperado).
+
+
 ---
 
 ## Fases Futuras
@@ -197,16 +209,6 @@ Acesso externo (fora de casa) continua futuro e não implementado: quando existi
 - [ ] Manter o SERVER como autoridade central e o CORE como camada de processamento.
 - [ ] O canal telefônico deve ser apenas mais uma interface do mesmo J.A.R.V.I.S., sem criar uma inteligência paralela.
 
-### 🏠 Fase 15: Integração Home Assistant (Concluída)
-- [x] Home Assistant como backbone de automação doméstica (`core/home_assistant/`, token somente no SERVER).
-- [x] Tools SHARED via remote bridge: `home_assistant_get_state(s)` (GREEN), `home_assistant_call_service` (YELLOW), `home_assistant_wake_on_lan` (GREEN); registradas só com role SERVER + HA habilitado.
-- [x] Wake-on-LAN para acordar o CORE quando necessário (`wake_on_lan.send_magic_packet`).
-- [x] Controle de dispositivos e cenas (scenes/scripts/automations via `call_service`, sem scheduler próprio).
-- [x] SERVER continua leve; processamento pesado permanece no CORE.
-- [x] Integração respeita o mesmo modelo central de identidade, estado e autorização (PolicyEngine/ConfirmationManager inalterados).
-- [x] Documentação (`docs/HOME_ASSISTANT.md`) e script de diagnóstico (`scripts/check_home_assistant.py`).
-- [x] Scheduler e automações via Home Assistant (acionamento por `call_service`; sem scheduler próprio em Python).
-- [x] Validação operacional: Docker `homeassistant-test` (imagem 2026.6.4, restart `unless-stopped`, persistente após restart), `scripts/check_home_assistant.py` (health/auth/20 entities), Google Home controlando o helper `JARVIS Teste` por voz via Tailscale Funnel (405 em GET esperado).
 
 ### 🎙️ Fase 16: Pipeline de Voz Local (Próxima)
 - [ ] Wake Word.
