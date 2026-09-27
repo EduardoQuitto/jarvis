@@ -66,7 +66,7 @@ curl http://127.0.0.1:8000/health -H "Authorization: Bearer YOUR_API_KEY"
 ## Running Tests Before Deployment
 
 ```bash
-pytest -v    # Ensure all 230 tests pass
+pytest -v    # Ensure all collected tests pass (463 passed, 2 platform-skipped)
 ```
 
 ## Phase 12 Manual Checklist (Ubuntu SERVER + Windows CORE)

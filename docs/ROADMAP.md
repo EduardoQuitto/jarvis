@@ -121,7 +121,7 @@
 
 ---
 
-### ✅ Fase 12: Central Server & Central State Authority (Implementada; validação operacional pendente)
+### ✅ Fase 12: Central Server & Central State Authority (Concluída)
 
 SERVER = control plane / source of truth. CORE = compute plane (Orchestrator, LLM, tools locais).
 
@@ -138,21 +138,23 @@ SERVER = control plane / source of truth. CORE = compute plane (Orchestrator, LL
 - [x] Arquitetura preparada para futuro acesso externo seguro sem exposição pública.
 - [x] 440 testes coletados, 438 passando, 0 falhas, 2 skips; `compileall` e `diff --check` limpos.
 
-#### Validação operacional da Fase 12 (Concluída)
+#### ✅ Validação operacional da Fase 12 (Concluída)
 
-- [x] 1. Ligar o Ubuntu Server.
-- [x] 2. Conferir/configurar manualmente o `.env` do SERVER, incluindo a credencial Gemini **somente no SERVER**.
-- [x] 3. Iniciar/reiniciar o serviço JARVIS no Ubuntu.
-- [x] 4. Verificar schema/migração da base central e saúde do SERVER.
-- [x] 5. Iniciar o CORE Windows e confirmar registro + heartbeat no SERVER.
-- [x] 6. Testar fluxo real **cliente → SERVER → CORE → Ollama → SERVER → cliente**.
-- [x] 7. Testar fluxo **CORE → SERVER relay → Gemini → SERVER → CORE**, garantindo que a chave Gemini não exista no CORE.
-- [x] 8. Testar conversação, memória e confirmations centralizadas.
-- [x] 9. Testar `POST /api/chat/stream` real e comportamento em falha/desconexão.
-- [x] 10. Confirmar logs, status dos dispositivos e ausência de secrets no Git.
+SERVER = control plane / source of truth; CORE = compute plane. Resultados verificados contra hardware real:
 
-**Não implementar nesta validação:** VPN/acesso externo, Home Assistant, voz, visão, Android ou novos bancos/filas.
+- [x] SERVER Ubuntu (`jarvisserver`, LAN `192.168.0.13`): `jarvis.service` funcionando, FastAPI/Uvicorn em `0.0.0.0:8000`, `/health` retornando `healthy` (serviço parado e reiniciado durante a validação).
+- [x] CORE Windows (LAN `192.168.0.8`): Ollama funcionando com `qwen3.5:4b`; auto-registro no SERVER + heartbeat periódico; SERVER identifica o dispositivo como `CORE` com capacidade `llm`.
+- [x] Fluxo distribuído real cliente -> SERVER -> CORE -> Ollama -> SERVER -> cliente via `POST /api/chat/send`, com resposta real recebida; SERVER retorna HTTP 503 sem CORE elegível e o fluxo volta após a recuperação do CORE.
+- [x] Conversas centralizadas: mensagens persistidas no SERVER, sequência user -> assistant/tool call -> tool result -> assistant final verificada.
+- [x] Memória central: CORE com `CentralMemoryProvider`, escrita/leitura via estado central, valor de teste recuperado corretamente.
+- [x] Confirmações centralizadas: criação, aprovação, consumo pelo CORE, single-use (segunda tentativa bloqueada), session binding/expiração funcionando.
+- [x] Gemini: chave real somente no SERVER (CORE sem a chave), acesso via relay do SERVER, `gemini-3.5-flash-lite` validado com geração real (health + generation OK).
+- [x] Streaming: `POST /api/chat/stream` (`text/event-stream`) com eventos `start`, `thinking`, `tool_call`, `tool_result`, `text_delta` e `done`; resposta final persistida no SERVER; desconexão do cliente sem traceback/ERROR nos logs do SERVER.
+- [x] Task Bridge: criação, consulta, atualização de progresso, conclusão e leitura do estado final via lifecycle remoto.
+- [x] Segurança/repositório: `.env` não versionado (só `.env.example`); nenhuma chave Gemini real no Git; `.gitignore` protege `.env`, bancos e ambientes virtuais.
+- [x] Testes da fase: 440 coletados, 438 passando, 0 falhas, 2 skips; `compileall` limpo; `git diff --check` limpo.
 
+Acesso externo (fora de casa) continua futuro e não implementado: quando existir, será cliente externo -> rede privada segura/VPN -> SERVER -> CORE, nunca exposição direta à internet pública. Fases futuras (voz, Android, visão, Home Assistant) seguem não implementadas.
 ### ✅ Fase 13: Acesso Externo Seguro
 - [x] Permitir uso do JARVIS fora de casa através de **rede privada/VPN**.
 - [x] SERVER permanece como único gateway da arquitetura.
@@ -166,8 +168,9 @@ SERVER = control plane / source of truth. CORE = compute plane (Orchestrator, LL
 
 ## Fases Futuras
 
-## 📞Fase 14: Telefonia & Agente de Chamadas
+## 📞Fase 14: Telefonia (intencionalmente pulada — backlog futuro, nada implementado)
 
+> Backlog preservado do planejamento anterior; fora da numeração ativa (que pula a Fase 14 e continua na Fase 15), em espera deliberada, nada implementado ou concluído.
 - [ ] Integrar um **número de telefone ao J.A.R.V.I.S.**, criando uma identidade telefônica própria para o agente.
 - [ ] Permitir que o J.A.R.V.I.S. **realize chamadas telefônicas de saída** a partir de instruções do usuário.
 - [ ] Permitir que o J.A.R.V.I.S. **atenda chamadas recebidas** automaticamente.
@@ -194,15 +197,18 @@ SERVER = control plane / source of truth. CORE = compute plane (Orchestrator, LL
 - [ ] Manter o SERVER como autoridade central e o CORE como camada de processamento.
 - [ ] O canal telefônico deve ser apenas mais uma interface do mesmo J.A.R.V.I.S., sem criar uma inteligência paralela.
 
-### 🏠 Fase 15: Integração Home Assistant
-- [ ] Home Assistant como backbone de automação doméstica.
-- [ ] Scheduler e automações no SERVER.
-- [ ] Wake-on-LAN para acordar o CORE quando necessário.
-- [ ] Controle de dispositivos e cenas.
-- [ ] SERVER continua leve; processamento pesado permanece no CORE.
-- [ ] Integração deve respeitar o mesmo modelo central de identidade, estado e autorização.
+### 🏠 Fase 15: Integração Home Assistant (Concluída)
+- [x] Home Assistant como backbone de automação doméstica (`core/home_assistant/`, token somente no SERVER).
+- [x] Tools SHARED via remote bridge: `home_assistant_get_state(s)` (GREEN), `home_assistant_call_service` (YELLOW), `home_assistant_wake_on_lan` (GREEN); registradas só com role SERVER + HA habilitado.
+- [x] Wake-on-LAN para acordar o CORE quando necessário (`wake_on_lan.send_magic_packet`).
+- [x] Controle de dispositivos e cenas (scenes/scripts/automations via `call_service`, sem scheduler próprio).
+- [x] SERVER continua leve; processamento pesado permanece no CORE.
+- [x] Integração respeita o mesmo modelo central de identidade, estado e autorização (PolicyEngine/ConfirmationManager inalterados).
+- [x] Documentação (`docs/HOME_ASSISTANT.md`) e script de diagnóstico (`scripts/check_home_assistant.py`).
+- [x] Scheduler e automações via Home Assistant (acionamento por `call_service`; sem scheduler próprio em Python).
+- [x] Validação operacional: Docker `homeassistant-test` (imagem 2026.6.4, restart `unless-stopped`, persistente após restart), `scripts/check_home_assistant.py` (health/auth/20 entities), Google Home controlando o helper `JARVIS Teste` por voz via Tailscale Funnel (405 em GET esperado).
 
-### 🎙️ Fase 16: Pipeline de Voz Local
+### 🎙️ Fase 16: Pipeline de Voz Local (Próxima)
 - [ ] Wake Word.
 - [ ] VAD (detecção de atividade de voz).
 - [ ] STT local, inicialmente com Whisper ou alternativa equivalente.
@@ -227,7 +233,7 @@ SERVER = control plane / source of truth. CORE = compute plane (Orchestrator, LL
 - [ ] Integração com o contexto do Orchestrator.
 - [ ] Separar percepção visual de planejamento e execução.
 - [ ] A percepção visual nunca deve conceder autorização automaticamente.
-- [ ] Preparar a base necessária para Computer Use da Fase 20.
+- [ ] Preparar a base necessária para Computer Use da Fase 21.
 
 ### 🧠 Fase 19: Memória Vetorial & Busca Semântica
 - [ ] Adicionar embeddings locais e busca semântica.

@@ -81,6 +81,13 @@ class Settings(BaseSettings):
         description="Google AI Studio OpenAI-compatible base URL",
     )
 
+    # Home Assistant (SERVER-side only: the token must never reach the CORE).
+    # Disabled by default: tools stay unregistered and the system is unaffected.
+    home_assistant_enabled: bool = Field(default=False, description="Enable Home Assistant integration on this node")
+    home_assistant_url: str = Field(default="", description="Home Assistant base URL (e.g. http://homeassistant.local:8123)")
+    home_assistant_token: str = Field(default="", description="Home Assistant Long-Lived Access Token (SERVER only)")
+    home_assistant_timeout: float = Field(default=10.0, description="Timeout in seconds for Home Assistant requests")
+
     # Network Security — SSRF Protection
     net_allow_private_networks: List[str] = Field(
         default_factory=list,
