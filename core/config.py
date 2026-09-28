@@ -88,6 +88,10 @@ class Settings(BaseSettings):
     home_assistant_token: str = Field(default="", description="Home Assistant Long-Lived Access Token (SERVER only)")
     home_assistant_timeout: float = Field(default=10.0, description="Timeout in seconds for Home Assistant requests")
 
+    # Notifications (Phase 15.1) — destinations come only from settings.
+    # No addresses/URLs are ever accepted from tools or the LLM.
+    notification_webhook_url: str = Field(default="", description="Configured webhook destination for notifications (empty = unavailable)")
+
     # Network Security — SSRF Protection
     net_allow_private_networks: List[str] = Field(
         default_factory=list,

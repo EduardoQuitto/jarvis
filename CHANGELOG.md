@@ -5,6 +5,30 @@ All notable changes to the J.A.R.V.I.S. project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] - 2026-09-28
+
+### Added
+- **Phase 15.1 — Utility Tools (13 tools, all GREEN):**
+  - Network: `ping_host` (TCP handshakes, no shell/ICMP privileges), `dns_lookup` (stdlib only), `get_network_interfaces` (normalized psutil).
+  - Notifications: `send_notification` / `check_pending_notifications` over a small provider abstraction (`core/notifications/`); push/desktop persist as pending with explicit reasons (no fake delivery), webhook posts only to the configured `JARVIS_NOTIFICATION_WEBHOOK_URL`.
+  - Filesystem: `find_duplicates` (size pre-grouping + chunked SHA-256, sandbox-contained) and `disk_usage_analysis` (bounded depth/entries/top-N).
+  - Security: `generate_password` (`secrets`, guaranteed character classes), `hash_file` (explicit algorithm allowlist, chunked), `verify_checksum` (explicit algorithm or documented auto-infer, constant-time compare).
+  - Utility: `calculate_math` (strict AST whitelist, no `eval()`).
+  - System diagnostics: `get_system_info` (truthful facts, explicit field allowlist, no secrets) and `get_system_uptime` (psutil, no shell).
+  - `JARVIS_NOTIFICATION_WEBHOOK_URL` setting (empty by default); `docs/UTILITY_TOOLS.md` and provider/channel documentation.
+- File sandbox test isolation fix in `test_param_kinds.py` (registry built inside the settings patch).
+
+### Changed
+- Project version 0.6.0 → 0.6.1 (`pyproject.toml`, FastAPI app, MCP `serverInfo`); installed package metadata reinstalled to match.
+- `docs/ROADMAP.md`: historic Fase 14 (telephony) explicitly marked as intentionally skipped; Home Assistant is Fase 15 (concluded); Local Voice Pipeline is Fase 16 (next); later phases renumbered accordingly.
+- `README.md`, `docs/TESTING.md`, `docs/DEPLOYMENT.md`: current test counts.
+
+### Security
+- No `shell=True`, no `eval()`, no new dependencies; shell protection stays on SHELL_ARG/IDENT params while FREE_TEXT/PATH/URL kinds keep legitimate content working.
+
+### Validation
+- 528 tests collected, 524 passed, 0 failed, 4 skipped; `compileall` clean; `git diff --check` clean.
+
 ## [0.6.0] - 2026-09-27
 
 ### Added
