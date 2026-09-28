@@ -16,6 +16,12 @@ from tools.builtin.memory_tool import SearchMemoryTool
 from tools.builtin.internet_tool import WebSearchTool, FetchUrlTool
 from tools.builtin.task_tool import CreateTaskTool
 from tools.builtin.remote_tool import RemoteServerTool, register_remote_tool
+from tools.builtin.network_tool import PingHostTool, DnsLookupTool, GetNetworkInterfacesTool
+from tools.builtin.notification_tool import SendNotificationTool, CheckPendingNotificationsTool
+from tools.builtin.filesystem_analysis_tool import FindDuplicatesTool, DiskUsageAnalysisTool
+from tools.builtin.security_tool import GeneratePasswordTool, HashFileTool, VerifyChecksumTool
+from tools.builtin.utility_tool import CalculateMathTool
+from tools.builtin.system_info_tool import GetSystemInfoTool, GetSystemUptimeTool
 from tools.builtin.home_assistant import (
     HomeAssistantGetStateTool,
     HomeAssistantGetStatesTool,
@@ -49,6 +55,19 @@ def register_default_tools(registry: ToolRegistry) -> None:
     registry.register(WebSearchTool())
     registry.register(FetchUrlTool())
     registry.register(CreateTaskTool())
+    registry.register(PingHostTool())
+    registry.register(DnsLookupTool())
+    registry.register(GetNetworkInterfacesTool())
+    registry.register(SendNotificationTool())
+    registry.register(CheckPendingNotificationsTool())
+    registry.register(FindDuplicatesTool())
+    registry.register(DiskUsageAnalysisTool())
+    registry.register(GeneratePasswordTool())
+    registry.register(HashFileTool())
+    registry.register(VerifyChecksumTool())
+    registry.register(CalculateMathTool())
+    registry.register(GetSystemInfoTool())
+    registry.register(GetSystemUptimeTool())
     register_remote_tool(registry)
     register_home_assistant_tools(registry)
 
@@ -73,6 +92,19 @@ __all__ = [
     "WebSearchTool",
     "FetchUrlTool",
     "CreateTaskTool",
+    "PingHostTool",
+    "DnsLookupTool",
+    "GetNetworkInterfacesTool",
+    "SendNotificationTool",
+    "CheckPendingNotificationsTool",
+    "FindDuplicatesTool",
+    "DiskUsageAnalysisTool",
+    "GeneratePasswordTool",
+    "HashFileTool",
+    "VerifyChecksumTool",
+    "CalculateMathTool",
+    "GetSystemInfoTool",
+    "GetSystemUptimeTool",
     "RemoteServerTool",
     "register_remote_tool",
     "HomeAssistantGetStateTool",

@@ -13,7 +13,7 @@ It is **not** a cloud chatbot. It is a local intelligence layer that runs on you
 
 ## Current Status
 
-**v0.6.0** (current) — **Phase 10 complete** (Security & Execution Boundary Hardening), operational CORE ↔ SERVER bridge, **Fase 11 complete** (real-time SSE streaming), **Fase 12 complete** (Central Server & Central State Authority: SERVER = gateway + source of truth, CORE = compute plane; Gemini key lives only on the SERVER relay) and **Fase 15 complete** (Home Assistant SERVER-only integration, validated against a real server with Google Home voice control).
+**v0.6.1** (current) — **Phase 10 complete** (Security & Execution Boundary Hardening), operational CORE ↔ SERVER bridge, **Fase 11 complete** (real-time SSE streaming), **Fase 12 complete** (Central Server & Central State Authority: SERVER = gateway + source of truth, CORE = compute plane; Gemini key lives only on the SERVER relay), **Fase 15 complete** (Home Assistant SERVER-only integration, validated against a real server with Google Home voice control) and **Fase 15.1 complete** (13 GREEN utility tools: network, notifications, filesystem, security, math, diagnostics).
 
 ### Implemented
 
@@ -298,7 +298,7 @@ pytest -q --no-header -p no:cacheprovider
 pytest tests/unit/test_goal_engine.py -v
 ```
 
-**465 tests** across unit and integration suites (463 passing, 2 platform-skipped):
+**528 tests** across unit and integration suites (524 passing, 4 platform-skipped):
 - Unit tests: contracts, config, planner, memory, security, tools, router, agents, goals, bridge, presence, tasks, Google provider, retry, confirmation flow, streaming, home_assistant
 - Integration tests: AI pipeline, E2E pipeline, multi-provider flow, goal-agent integration, mocked bridge/presence/task lifecycles
 
@@ -330,7 +330,7 @@ The test database (`data/jarvis.db`) is **never touched** by tests. Each test ru
 2. Create a feature branch: `git checkout -b feature/my-change`
 3. Make your changes following the project's coding standards (see `docs/AGENTS.md`)
 4. Run the full test suite: `pytest -v`
-5. Ensure all collected tests pass with 0 failures (463 passed, 2 skipped on Windows without symlink privilege)
+5. Ensure all collected tests pass with 0 failures (524 passed, 4 skipped on Windows without symlink privilege)
 6. Commit your changes with a clear message
 7. Push and open a Pull Request
 
