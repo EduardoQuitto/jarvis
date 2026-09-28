@@ -45,6 +45,10 @@
 - [x] Eventos `PROVIDER_SELECTED`, `PROVIDER_FAILED`, `ROUTING_STARTED` no EventBus.
 - [x] 41 novos testes (total: 110 testes, 0 falhas, 0 warnings).
 
+#### Planned extension — Neural Load Balancer v1 (futuro, D)
+- [ ] Estender o scoring com sinais reais de telemetria (CPU, RAM, latência) e capacidade do modelo, sem criar um segundo roteador.
+- [ ] Migração live de tarefas em execução está explicitamente fora do escopo (arquitetura stateless, sem motor de migração).
+
 ### ✅ Fase 8: Security Hardening (Concluída)
 - [x] Confirmação corrigida: `confirmed` removido do Orchestrator/Chat API → `approved`.
 - [x] ConfirmationManager: `session_id`/`call_id` vinculados, `consume()` single-use.
@@ -90,6 +94,12 @@
 - [x] CORS: configuração via `JARVIS_CORS_ORIGINS`, production same-origin only.
 - [x] ConfirmationManager: timestamps, cleanup de expirados, bloqueio de reuse, log de tentativas.
 - [x] 28 novos testes adversariais (total: 230 testes, 0 falhas, 0 warnings).
+
+#### Planned extension — Adaptive Security Posture (futuro, HIGH-RISK, F)
+- [ ] Hook determinístico versionado sobre o PolicyEngine, somente após volume de auditoria/observabilidade (Phase 23).
+- [ ] Garantias obrigatórias: regras determinísticas; somente escalada GREEN para postura mais restritiva; LLM nunca aumenta permissões nem altera a própria autorização; fail-safe para o mais restritivo; expiração automática; toda mudança em `audit_logs`; override explícito do operador.
+- [ ] Testes adversariais obrigatórios (prompt injection tentando afrouxar a postura deve falhar).
+- [ ] Nunca expor como tool ao LLM.
 
 ### Limitações Conhecidas da Fase 10
 
@@ -155,6 +165,12 @@ SERVER = control plane / source of truth; CORE = compute plane. Resultados verif
 - [x] Testes da fase: 440 coletados, 438 passando, 0 falhas, 2 skips; `compileall` limpo; `git diff --check` limpo.
 
 Acesso externo (fora de casa) continua futuro e não implementado: quando existir, será cliente externo -> rede privada segura/VPN -> SERVER -> CORE, nunca exposição direta à internet pública. Fases futuras (voz, Android, visão, Home Assistant) seguem não implementadas.
+
+#### Planned extensions — Temporal, Vault, Resurrection (futuro, A/H/I)
+- [ ] Modelo e persistência de compromissos temporais e intenções condicionais (`temporal_commitments`: gatilho tempo|evento|condições, ação, autorização, expiração) sobre o padrão central existente; sem ticker próprio.
+- [ ] Avaliação de condições determinística sobre estado HA/relógio (nunca julgamento do LLM no disparo); execução e expiração via PolicyEngine/ConfirmationManager existentes.
+- [ ] Cápsulas cognitivas de contexto (conversa+goals+tasks via Central State); restore sempre como checklist reaplicado com confirmações, nunca injeção de estado.
+
 ### ✅ Fase 13: Acesso Externo Seguro
 - [x] Permitir uso do JARVIS fora de casa através de **rede privada/VPN**.
 - [x] SERVER permanece como único gateway da arquitetura.
@@ -174,6 +190,9 @@ Acesso externo (fora de casa) continua futuro e não implementado: quando existi
 - [x] Documentação (`docs/HOME_ASSISTANT.md`) e script de diagnóstico (`scripts/check_home_assistant.py`).
 - [x] Scheduler e automações via Home Assistant (acionamento por `call_service`; sem scheduler próprio em Python).
 - [x] Validação operacional: Docker `homeassistant-test` (imagem 2026.6.4, restart `unless-stopped`, persistente após restart), `scripts/check_home_assistant.py` (health/auth/20 entities), Google Home controlando o helper `JARVIS Teste` por voz via Tailscale Funnel (405 em GET esperado).
+
+#### Planned extension — Energy-Aware Compute, leitura (futuro, G)
+- [ ] Convenção de leitura de sensores de energia (solar/tarifa/bateria) via tools HA existentes + cálculo puro de política; sem scheduler implícito (adiamento real aguarda Phase 26).
 
 
 ---
@@ -219,6 +238,9 @@ Acesso externo (fora de casa) continua futuro e não implementado: quando existi
 - [ ] Voz deve utilizar o mesmo JARVIS central, memória, Goals e segurança.
 - [ ] Não criar uma segunda inteligência paralela.
 
+#### Planned extensions usando voz (futuro)
+- [ ] Entrega falada de compromissos/notificações proativas quando existirem (A4, J3); voz como perna de entrega, sem lógica própria de agendamento.
+
 ### 📱 Fase 17: Android & Tablet Dashboard
 - [ ] Priorizar Home Assistant Companion e/ou ADB para integração Android.
 - [ ] Telemetria, notificações, câmera, microfone e sensores.
@@ -227,6 +249,9 @@ Acesso externo (fora de casa) continua futuro e não implementado: quando existi
 - [ ] Avaliar Termux/Termux:API quando um agente local Android for realmente necessário.
 - [ ] Ações sensíveis no Android continuam passando pelo modelo de segurança do JARVIS.
 - [ ] O canal telefônico deve tratar identidade, autorização, logs e limites de uso antes de permitir ações reais.
+
+#### Planned extensions usando mobile (futuro)
+- [ ] Entrega push real e presença móvel para proatividade (A4) e atenção (J2) quando a infraestrutura existir; perna mobile de ressurreição de contexto (I) com os mesmos limites de serialização.
 
 ### 👁️ Fase 18: Visão Computacional
 - [ ] Captura de tela.
@@ -258,6 +283,9 @@ Acesso externo (fora de casa) continua futuro e não implementado: quando existi
 - [ ] Permitir retomada de Goals longos após interrupções.
 - [ ] Trabalhar com orçamento de tokens, tempo, ferramentas e limites de execução.
 - [ ] Supervisão humana para decisões críticas.
+
+#### Planned extensions supervisionadas (futuro)
+- [ ] Restore lógico de contexto/cápsulas (C3) e execução supervisionada de compromissos/intenções (A5, H) somente com confirmação e validação por etapa; nunca autonomia irrestrita.
 - [ ] Validar cada etapa antes de permitir que a próxima ação material seja executada.
 - [ ] Não confundir autonomia com ausência de controle do usuário.
 - [ ] Evoluir o `IntelligenceRouter` para diferenciar necessidades de **thinking/reasoning** e **action/execution**.
@@ -292,6 +320,9 @@ Acesso externo (fora de casa) continua futuro e não implementado: quando existi
 - [ ] Commit/PR para revisão humana antes de alterar a linha principal.
 - [ ] Registrar arquivos alterados, testes executados, resultados e motivo da alteração.
 - [ ] Permitir evolução incremental, nunca substituir o sistema inteiro em uma única operação.
+
+#### Planned extension (futuro)
+- [ ] Restore privilegiado/destrutivo (C4) como tool RED com confirmação explícita do operador e auditoria completa; sem ele, snapshots permanecem somente-observação.
 - [ ] Self-editing deve usar as mesmas políticas de segurança e confirmação do restante do JARVIS.
 
 ### 📊 Fase 23: Observabilidade, Benchmarks & Eficiência
@@ -305,6 +336,11 @@ Acesso externo (fora de casa) continua futuro e não implementado: quando existi
 - [ ] OpenTelemetry ou solução equivalente somente quando houver necessidade real.
 - [ ] Incluir testes de regressão de streaming, gateway e comunicação distribuída.
 - [ ] A observabilidade deve preservar privacidade e nunca registrar secrets.
+
+#### Planned extensions (futuro)
+- [ ] Snapshots lógicos de estado + comparação determinística (C1/C2, somente leitura/GREEN).
+- [ ] Histórico de saúde de hardware e thresholds determinísticos (E1–E3, sem estimar vida útil, sem ação automática).
+- [ ] Crescer o volume de auditoria que fundamente futuro posture de segurança (F depende destes dados).
 
 ### 🧩 Fase 24: Plugin System & Extensibilidade
 - [ ] Sistema de extensões/plugins com contratos claros.
@@ -327,6 +363,34 @@ Acesso externo (fora de casa) continua futuro e não implementado: quando existi
 
 ---
 
+### 🗓️ Fase 26: Scheduler Foundation
+- [ ] Criar uma fundação de scheduler persistente para execução futura de tarefas e compromissos temporais.
+- [ ] Suportar avaliação/execução de eventos temporais sem depender de polling ad hoc espalhado pelo código.
+- [ ] Persistir compromissos, agendamentos, estado de execução, retry e expiração.
+- [ ] Preparar a infraestrutura para compromissos temporais, notificações proativas, deferral de tarefas e execução supervisionada.
+- [ ] Integrar com o estado central do SERVER.
+- [ ] Preservar PolicyEngine, ConfirmationManager e os limites existentes de autorização.
+- [ ] Não criar autonomia irrestrita.
+- [ ] Não introduzir filas/workers distribuídos ou infraestrutura pesada sem necessidade comprovada.
+- [ ] Preparar a base para Temporal Context Bridge, Energy-Aware Compute, Conditional Intention Vault e Attention Budget Guard.
+- [ ] Permitir que o IntelligenceRouter futuramente utilize telemetria real para decisões de roteamento.
+- [ ] Manter execução material sujeita às mesmas políticas de segurança do restante do JARVIS.
+
+### 🔎 Fase 27: Evidence & Verification Service
+- [ ] Criar uma camada dedicada para coleta e comparação de evidências.
+- [ ] Permitir verificação cruzada de informações usando múltiplas fontes independentes quando apropriado.
+- [ ] Diferenciar evidência, memória, inferência e resposta gerada.
+- [ ] Detectar e preservar conflitos entre fontes em vez de ocultá-los.
+- [ ] Integrar com web search, memória central e outras fontes existentes sem duplicar suas responsabilidades.
+- [ ] Evitar votação ingênua entre respostas de LLM.
+- [ ] Definir critérios determinísticos de confiabilidade/peso das fontes quando possível.
+- [ ] Expor ao Orchestrator evidências e conflitos de forma estruturada.
+- [ ] Não transformar verificação de evidência em mecanismo de autorização.
+- [ ] Preservar PolicyEngine e ConfirmationManager como autoridade de segurança.
+- [ ] Preparar a base para Reality Anchor e futuras funções de comparação/verificação de estado.
+
+---
+
 ## Considerações Técnicas Transversais
 
 - [ ] Alinhar a versão mínima do Python declarada em `pyproject.toml`, documentação e ambiente de execução antes de declarar suporte oficial.
@@ -337,6 +401,8 @@ Acesso externo (fora de casa) continua futuro e não implementado: quando existi
 - [ ] Toda evolução deve preservar as garantias de segurança das Fases 8 e 10.
 - [ ] Toda mudança importante deve incluir testes, documentação e validação.
 - [ ] O sistema nunca deve mascarar falhas de provider, rede, memória, execução ou estado.
+- [ ] Capacidades explicitamente fora do escopo imediato (não implementar sem as fundações acima): push mobile real, execução autônoma irrestrita, restore destrutivo sem confirmação, migração live de tarefas, estimativa de vida útil de hardware, ML local obrigatório, rebaixamento automático de segurança, scheduler distribuído e qualquer nova fila/broker externo.
+- [ ] A combinação arquitetural proposta (hub local-first com scheduler determinístico, PolicyEngine única e estado central) é tratada como hipótese de diferenciação do JARVIS, não como afirmação de inexistência de sistemas semelhantes.
 - [ ] O SERVER continua sendo **control plane / source of truth**.
 - [ ] O CORE continua sendo **compute plane**.
 - [ ] O hardware deve continuar desacoplado do desenho de software.
