@@ -45,7 +45,7 @@
 - [x] Eventos `PROVIDER_SELECTED`, `PROVIDER_FAILED`, `ROUTING_STARTED` no EventBus.
 - [x] 41 novos testes (total: 110 testes, 0 falhas, 0 warnings).
 
-#### Planned extension — Neural Load Balancer v1 (futuro, D)
+#### ⚠️ Planned extension — Neural Load Balancer v1 (futuro, D)
 - [ ] Estender o scoring com sinais reais de telemetria (CPU, RAM, latência) e capacidade do modelo, sem criar um segundo roteador.
 - [ ] Migração live de tarefas em execução está explicitamente fora do escopo (arquitetura stateless, sem motor de migração).
 
@@ -95,7 +95,7 @@
 - [x] ConfirmationManager: timestamps, cleanup de expirados, bloqueio de reuse, log de tentativas.
 - [x] 28 novos testes adversariais (total: 230 testes, 0 falhas, 0 warnings).
 
-#### Planned extension — Adaptive Security Posture (futuro, HIGH-RISK, F)
+#### ⚠️ Planned extension — Adaptive Security Posture (futuro, HIGH-RISK, F)
 - [ ] Hook determinístico versionado sobre o PolicyEngine, somente após volume de auditoria/observabilidade (Phase 23).
 - [ ] Garantias obrigatórias: regras determinísticas; somente escalada GREEN para postura mais restritiva; LLM nunca aumenta permissões nem altera a própria autorização; fail-safe para o mais restritivo; expiração automática; toda mudança em `audit_logs`; override explícito do operador.
 - [ ] Testes adversariais obrigatórios (prompt injection tentando afrouxar a postura deve falhar).
@@ -166,7 +166,7 @@ SERVER = control plane / source of truth; CORE = compute plane. Resultados verif
 
 Acesso externo (fora de casa) continua futuro e não implementado: quando existir, será cliente externo -> rede privada segura/VPN -> SERVER -> CORE, nunca exposição direta à internet pública. Fases futuras (voz, Android, visão, Home Assistant) seguem não implementadas.
 
-#### Planned extensions — Temporal, Vault, Resurrection (futuro, A/H/I)
+#### ⚠️ Planned extensions — Temporal, Vault, Resurrection (futuro, A/H/I)
 - [ ] Modelo e persistência de compromissos temporais e intenções condicionais (`temporal_commitments`: gatilho tempo|evento|condições, ação, autorização, expiração) sobre o padrão central existente; sem ticker próprio.
 - [ ] Avaliação de condições determinística sobre estado HA/relógio (nunca julgamento do LLM no disparo); execução e expiração via PolicyEngine/ConfirmationManager existentes.
 - [ ] Cápsulas cognitivas de contexto (conversa+goals+tasks via Central State); restore sempre como checklist reaplicado com confirmações, nunca injeção de estado.
@@ -191,7 +191,7 @@ Acesso externo (fora de casa) continua futuro e não implementado: quando existi
 - [x] Scheduler e automações via Home Assistant (acionamento por `call_service`; sem scheduler próprio em Python).
 - [x] Validação operacional: Docker `homeassistant-test` (imagem 2026.6.4, restart `unless-stopped`, persistente após restart), `scripts/check_home_assistant.py` (health/auth/20 entities), Google Home controlando o helper `JARVIS Teste` por voz via Tailscale Funnel (405 em GET esperado).
 
-#### Planned extension — Energy-Aware Compute, leitura (futuro, G)
+#### ⚠️ Planned extension — Energy-Aware Compute, leitura (futuro, G)
 - [ ] Convenção de leitura de sensores de energia (solar/tarifa/bateria) via tools HA existentes + cálculo puro de política; sem scheduler implícito (adiamento real aguarda Phase 26).
 
 
@@ -238,7 +238,7 @@ Acesso externo (fora de casa) continua futuro e não implementado: quando existi
 - [ ] Voz deve utilizar o mesmo JARVIS central, memória, Goals e segurança.
 - [ ] Não criar uma segunda inteligência paralela.
 
-#### Planned extensions usando voz (futuro)
+#### ⚠️ Planned extensions usando voz (futuro)
 - [ ] Entrega falada de compromissos/notificações proativas quando existirem (A4, J3); voz como perna de entrega, sem lógica própria de agendamento.
 
 ### 📱 Fase 17: Android & Tablet Dashboard
@@ -250,7 +250,7 @@ Acesso externo (fora de casa) continua futuro e não implementado: quando existi
 - [ ] Ações sensíveis no Android continuam passando pelo modelo de segurança do JARVIS.
 - [ ] O canal telefônico deve tratar identidade, autorização, logs e limites de uso antes de permitir ações reais.
 
-#### Planned extensions usando mobile (futuro)
+#### ⚠️ Planned extensions usando mobile (futuro)
 - [ ] Entrega push real e presença móvel para proatividade (A4) e atenção (J2) quando a infraestrutura existir; perna mobile de ressurreição de contexto (I) com os mesmos limites de serialização.
 
 ### 👁️ Fase 18: Visão Computacional
@@ -284,7 +284,7 @@ Acesso externo (fora de casa) continua futuro e não implementado: quando existi
 - [ ] Trabalhar com orçamento de tokens, tempo, ferramentas e limites de execução.
 - [ ] Supervisão humana para decisões críticas.
 
-#### Planned extensions supervisionadas (futuro)
+#### ⚠️ Planned extensions supervisionadas (futuro)
 - [ ] Restore lógico de contexto/cápsulas (C3) e execução supervisionada de compromissos/intenções (A5, H) somente com confirmação e validação por etapa; nunca autonomia irrestrita.
 - [ ] Validar cada etapa antes de permitir que a próxima ação material seja executada.
 - [ ] Não confundir autonomia com ausência de controle do usuário.
@@ -321,7 +321,7 @@ Acesso externo (fora de casa) continua futuro e não implementado: quando existi
 - [ ] Registrar arquivos alterados, testes executados, resultados e motivo da alteração.
 - [ ] Permitir evolução incremental, nunca substituir o sistema inteiro em uma única operação.
 
-#### Planned extension (futuro)
+#### ⚠️ Planned extension (futuro)
 - [ ] Restore privilegiado/destrutivo (C4) como tool RED com confirmação explícita do operador e auditoria completa; sem ele, snapshots permanecem somente-observação.
 - [ ] Self-editing deve usar as mesmas políticas de segurança e confirmação do restante do JARVIS.
 
@@ -337,7 +337,7 @@ Acesso externo (fora de casa) continua futuro e não implementado: quando existi
 - [ ] Incluir testes de regressão de streaming, gateway e comunicação distribuída.
 - [ ] A observabilidade deve preservar privacidade e nunca registrar secrets.
 
-#### Planned extensions (futuro)
+#### ⚠️ Planned extensions (futuro)
 - [ ] Snapshots lógicos de estado + comparação determinística (C1/C2, somente leitura/GREEN).
 - [ ] Histórico de saúde de hardware e thresholds determinísticos (E1–E3, sem estimar vida útil, sem ação automática).
 - [ ] Crescer o volume de auditoria que fundamente futuro posture de segurança (F depende destes dados).
