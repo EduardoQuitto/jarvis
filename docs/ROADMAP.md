@@ -194,6 +194,13 @@ Acesso externo (fora de casa) continua futuro e não implementado: quando existi
 #### Planned extension — Energy-Aware Compute, leitura (futuro, G)
 - [ ] Convenção de leitura de sensores de energia (solar/tarifa/bateria) via tools HA existentes + cálculo puro de política; sem scheduler implícito (adiamento real aguarda Phase 26).
 
+#### Fase 15.2: Context Architecture (Concluída)
+- [x] Orçamento de contexto por provider/modelo (`core/context/budget.py`).
+- [x] Seleção determinística de ferramentas (`core/context/tool_selector.py`).
+- [x] Compactação determinística de histórico (`core/context/compaction.py`, `conversation_summaries`).
+- [x] Rebuild do contexto antes de cada chamada LLM, incluindo streaming.
+- [x] `max_tokens` derivado do profile do provider; regressão do qwen3.5:4b corrigida.
+
 
 ---
 

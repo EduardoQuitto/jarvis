@@ -93,6 +93,7 @@ graph TD
 | `core/agent` | Agent execution, factory, registry, security | Yes (100%) |
 | `core/llm` | LLM providers, routing, circuit breaker | Yes (100%) |
 | `core/conversation` | Conversation context building | Yes (100%) |
+| `core/context` | Context budget, compaction, task context, tool selection (Phase 15.2) | Yes (100%) |
 | `core/mcp` | MCP server (JSON-RPC 2.0) | Yes (100%) |
 | `core/task` | Task management and execution | Yes (100%) |
 | `security/` | PolicyEngine, allowlist, auth, SSRF protection | Yes (100%) |
@@ -201,6 +202,17 @@ fonte de verdade com central state desabilitado (padrão em testes/dev).
   (Ollama + tools); central state em modo required falha explicitamente.
   Acesso externo futuro passa por rede privada/VPN (fase futura) → SERVER
   → CORE; nada é exposto à internet pública.
+
+### Context Architecture (Phase 15.2)
+
+- **Context Budget** (`core/context/budget.py`): explicit token budget per LLM call. Sections: system prompt, task context, memory, history, tool definitions, response reserve. Provider-aware via `ProviderContextProfile` (qwen3.5:4b = 4096 total, gemini-3.7-flash = 1M+). Safety margin of 85% prevents prompt from consuming the entire window.
+- **Conversation Compaction** (`core/context/compaction.py`): deterministic compaction for long conversations. Triggers when context exceeds 70% of budget. Produces a structured summary of older messages while preserving recent messages verbatim. Original history is NEVER deleted — summaries are persisted in `conversation_summaries` table.
+- **Task Context** (`core/context/task_context.py`): compact operational state representation using existing `Task` and `TaskCheckpoint`. Produces structured sections: TASK, CURRENT STATE, PROGRESS, IMPORTANT DECISIONS, KNOWN ISSUES, NEXT STEP.
+- **Tool Context Selection** (`core/context/tool_selector.py`): deterministic tool selection based on keyword matching against tool metadata. Reduces the tool set sent to the LLM. NOT an authorization layer — PolicyEngine remains the sole authority. Fallback expands the set when confidence is low.
+- **Context Window Manager** (`core/context/manager.py`): budget-aware context assembly. Integrates compaction, task context, and memory. Evolves the simple "last N messages" window into a prioritized, token-budget-aware approach.
+- **Relevant Memory**: uses existing `search_memory` (SQLite LIKE-based). No embeddings or vector DB in this phase (Phase 19).
+- **Persistence**: compaction summaries stored in SQLite `conversation_summaries` table. Compatible with central state mode.
+- **Observability**: budget utilization, section breakdown, compaction events, and tool selection confidence are logged.
 
 ### Other Security Components
 - **ConfirmationManager** issues single-use, session-bound tokens for YELLOW/RED actions with timestamps, expiry, and reuse blocking.

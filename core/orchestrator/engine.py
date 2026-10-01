@@ -28,6 +28,7 @@ from core.contracts.orchestrator import (
     OrchestratorStreamEvent,
     OrchestratorToolResult,
 )
+from core.config import get_settings
 from core.conversation.manager import ConversationManager
 from core.conversation.context_builder import ContextBuilder
 from core.orchestrator.tool_executor import ToolExecutor
@@ -35,6 +36,8 @@ from core.orchestrator.confirmation import ConfirmationManager, get_confirmation
 from core.orchestrator.system_prompt import build_system_prompt
 from core.events.bus import get_event_bus
 from core.events.models import EventType, SystemEvent
+from core.context.tool_selector import ToolContextSelector
+from core.context.task_context import TaskContextBuilder
 from core.logger import get_logger
 
 logger = get_logger("jarvis.orchestrator")
@@ -156,6 +159,8 @@ class Orchestrator:
         conversation_manager: Optional[ConversationManager] = None,
         tool_executor: Optional[Any] = None,
         confirmation_manager: Optional[ConfirmationManager] = None,
+        task_manager: Optional[Any] = None,
+        tool_selector: Optional[ToolContextSelector] = None,
     ):
         self._llm = llm_provider
         self._router = router
@@ -164,18 +169,82 @@ class Orchestrator:
         self._confirmations = confirmation_manager or get_confirmation_manager()
         self._context_builder = ContextBuilder()
         self._event_bus = get_event_bus()
+        self._task_manager = task_manager
+        # Phase 15.2: selection is active by default (driven by settings),
+        # so unnecessary tools are not sent to the LLM. An explicitly
+        # passed selector (including tests) is always honored; None means
+        # "decide from JARVIS_TOOL_SELECTION_ENABLED". Selection never
+        # authorizes execution — PolicyEngine remains the sole authority.
+        self._tool_selector = tool_selector
+        if self._tool_selector is None and get_settings().tool_selection_enabled:
+            self._tool_selector = ToolContextSelector(
+                min_tools=get_settings().tool_selection_min_tools,
+                max_tools=get_settings().tool_selection_max_tools,
+            )
+        self._task_context_builder = TaskContextBuilder()
 
     async def _call_llm(
         self,
         messages: List[LLMMessage],
         tools: Optional[List[LLMToolDef]] = None,
+        max_tokens: Optional[int] = None,
     ):
         """Call the LLM through whatever backend is configured (provider or router)."""
         if self._router is not None:
-            return await self._router.route(messages=messages, tools=tools)
+            return await self._router.route(messages=messages, tools=tools, max_tokens=max_tokens)
         if self._llm is None:
             raise RuntimeError("No LLM provider or router configured")
-        return await self._llm.generate(messages=messages, tools=tools)
+        return await self._llm.generate(messages=messages, tools=tools, max_tokens=max_tokens)
+
+    async def _prepare_llm_call(
+        self,
+        messages: List[LLMMessage],
+        tools: Optional[List[LLMToolDef]],
+        system_prompt: str = "",
+        task_context: Optional[str] = None,
+        memory_context: Optional[str] = None,
+    ):
+        """Rebuild the LLM context through the single ContextBuilder path.
+
+        Called before EVERY LLM call — first turn and every post-tool-call
+        iteration — so each call respects the Phase 15.2 budget. The
+        in-memory `messages` (including assistant tool calls and tool
+        results produced in the current round) are rebuilt without the
+        stale leading system message; nothing is rebuilt from the DB here
+        so the current round state is never lost.
+
+        Returns (messages, tools, max_tokens). With
+        JARVIS_CONTEXT_BUDGET_ENABLED=false the inputs pass through
+        untouched and max_tokens is None (legacy behavior).
+
+        NOTE (requirement 9): the budget derives from the configured
+        default provider profile (JARVIS_LLM_PROVIDER/JARVIS_LLM_MODEL).
+        The IntelligenceRouter may fall back to a different provider at
+        call time; per-call provider awareness is a known limitation and
+        is intentionally not solved here.
+        """
+        settings = get_settings()
+        if not settings.context_budget_enabled:
+            return messages, tools, None
+        conv = messages[1:] if (messages and messages[0].role == "system") else list(messages)
+        rebuilt = self._context_builder.build(
+            system_prompt=system_prompt,
+            conversation_messages=conv,
+            task_state=task_context,
+            memory_context=memory_context,
+            tools=tools,
+        )
+        max_tokens = self._context_builder.max_output_tokens
+        summary = self._context_builder.last_build_summary or {}
+        logger.info(
+            "LLM call prepared: provider=%s model=%s messages=%d tools=%d "
+            "prompt_tokens=%d/%d max_tokens=%s compacted=%s",
+            settings.llm_provider, settings.llm_model,
+            len(rebuilt), len(tools or []),
+            summary.get("used_tokens", 0), summary.get("available_tokens", 0),
+            max_tokens, self._context_builder.last_compaction is not None,
+        )
+        return rebuilt, tools, max_tokens
 
     def _stream_event(self, event_type: OrchestratorMessageType, **data: Any) -> OrchestratorStreamEvent:
         """Build one structured streaming event (SSE name = type lowercased)."""
@@ -186,6 +255,7 @@ class Orchestrator:
         messages: List[LLMMessage],
         tools: Optional[List[LLMToolDef]],
         acc: "_StreamTurnAccumulator",
+        max_tokens: Optional[int] = None,
     ) -> AsyncGenerator[str, None]:
         """Yield live text deltas from the provider/router stream.
 
@@ -193,9 +263,9 @@ class Orchestrator:
         never duplicated here. Tool-call deltas are buffered into acc.
         """
         if self._router is not None:
-            stream = self._router.route_stream(messages=messages, tools=tools)
+            stream = self._router.route_stream(messages=messages, tools=tools, max_tokens=max_tokens)
         elif self._llm is not None:
-            stream = self._llm.generate_stream(messages=messages, tools=tools)
+            stream = self._llm.generate_stream(messages=messages, tools=tools, max_tokens=max_tokens)
         else:
             raise RuntimeError("No LLM provider or router configured")
         async for chunk in stream:
@@ -207,10 +277,12 @@ class Orchestrator:
             for fragment in chunk.tool_calls_raw or []:
                 acc.add_tool_raw(fragment)
 
-    async def _build_tools_list(self):
+    async def _build_tools_list(self, query: str = ""):
         """Build the tools list for the current session.
 
         If the next provider is external, only SHARED tools are sent.
+        Phase 15.2: Uses ToolContextSelector to reduce the tool set
+        based on the current query context.
         """
         from tools.registry import get_tool_registry
         from tools import register_default_tools
@@ -221,9 +293,22 @@ class Orchestrator:
         if self._router is not None:
             shared_only = not await self._router.is_next_provider_local()
 
-        return registry, self._context_builder.build_tools_list(
-            registry.list_tools(), shared_only=shared_only,
-        )
+        all_tools = registry.list_tools()
+        if shared_only:
+            all_tools = [t for t in all_tools if t.visibility.value == "SHARED"]
+
+        settings = get_settings()
+        if settings.tool_selection_enabled and self._tool_selector is not None:
+            result = self._tool_selector.select(all_tools, query=query, shared_only=False)
+            selected_metadata = result.selected_tools
+            logger.info(
+                "Tool selection: %d/%d tools (confidence=%.2f, fallback=%s)",
+                len(selected_metadata), len(all_tools), result.confidence, result.fallback_used,
+            )
+        else:
+            selected_metadata = all_tools
+
+        return registry, self._context_builder.build_tools_list(selected_metadata)
 
     async def _persist_tool_result(self, session_id, tool_msg) -> None:
         """Persist one tool result so restarts keep a valid sequence.
@@ -235,6 +320,55 @@ class Orchestrator:
             session_id, "tool", tool_msg.content or "",
             tool_call_id=tool_msg.tool_call_id, name=tool_msg.name,
         )
+
+    async def _build_task_context(self, session_id: str) -> Optional[str]:
+        """Build compact task context for the current session.
+
+        Uses the existing TaskManager to retrieve the task associated
+        with this conversation and its checkpoints.
+        """
+        if self._task_manager is None:
+            return None
+        try:
+            session = await self._conversation.get_session_info(session_id)
+            if not session or not session.task_id:
+                return None
+            task = await self._task_manager.get_task(session.task_id)
+            if not task:
+                return None
+            mem = self._conversation._get_memory()
+            checkpoints = await mem.get_task_checkpoints(session.task_id)
+            return self._task_context_builder.build(task, checkpoints)
+        except Exception as e:
+            logger.debug("Task context build failed: %s", e)
+            return None
+
+    def set_task_manager(self, task_manager: Any) -> None:
+        """Set the task manager (avoids circular import at construction time)."""
+        self._task_manager = task_manager
+
+    async def _build_memory_context(self, message: str) -> Optional[str]:
+        """Build relevant memory context for the current message.
+
+        Uses the existing memory search to find relevant entries.
+        """
+        try:
+            from memory import get_memory_provider
+            memory = get_memory_provider()
+            results = await memory.search_memory(query=message, limit=5)
+            if not results:
+                return None
+            parts = []
+            for r in results[:5]:
+                key = r.get("key", "")
+                value = r.get("value", "")
+                if isinstance(value, dict):
+                    value = json.dumps(value, default=str)
+                parts.append(f"- {key}: {str(value)[:200]}")
+            return "\n".join(parts)
+        except Exception as e:
+            logger.debug("Memory context build failed: %s", e)
+            return None
 
     async def _process_single_call(
         self, registry, tool_name, arguments, call_id, session_id, remaining_calls,
@@ -461,7 +595,7 @@ class Orchestrator:
             # this flag; only this approved-resume branch passes True.
             logger.info("Resuming confirmed tool: %s (cid=%s)", cid_result["tool_name"], request.confirmation_id)
 
-            registry, tools = await self._build_tools_list()
+            registry, tools = await self._build_tools_list(query=cid_result["tool_name"])
             tool = registry.get(cid_result["tool_name"])
 
             result = await self._tool_executor.execute_tool_call(
@@ -527,14 +661,25 @@ class Orchestrator:
                 device_capabilities=request.device_capabilities,
                 available_tool_names=[t.function.name for t in tools],
             )
+            task_context = await self._build_task_context(session_id)
+            memory_context = await self._build_memory_context(cid_result["tool_name"])
             messages = self._context_builder.build(
                 system_prompt=system_prompt,
                 conversation_messages=history,
+                task_state=task_context,
+                memory_context=memory_context,
+                tools=tools,
             )
 
             # Single LLM call to summarize the result. Never mask a tool
             # failure as success when the LLM returns no summary text.
-            response = await self._call_llm(messages=messages, tools=tools)
+            messages, tools, llm_max_tokens = await self._prepare_llm_call(
+                messages, tools,
+                system_prompt=system_prompt,
+                task_context=task_context,
+                memory_context=memory_context,
+            )
+            response = await self._call_llm(messages=messages, tools=tools, max_tokens=llm_max_tokens)
             failed = [r for r in results if not r.success]
             if response.content:
                 final_text = response.content
@@ -564,11 +709,15 @@ class Orchestrator:
         # Get conversation history
         history = await self._conversation.get_context_window(session_id)
 
+        # Build task context and memory context (Phase 15.2)
+        task_context = await self._build_task_context(session_id)
+        memory_context = await self._build_memory_context(request.message)
+
         # Build system prompt. Names come from the exact tool definitions
         # sent to the provider (already visibility-filtered) — never from
         # the full registry, so LOCAL_ONLY names can't leak into the prompt
         # of a cloud LLM.
-        registry, tools = await self._build_tools_list()
+        registry, tools = await self._build_tools_list(query=request.message)
         tool_names = [t.function.name for t in tools]
         system_prompt = build_system_prompt(
             device_id=request.device_id,
@@ -580,6 +729,9 @@ class Orchestrator:
         messages = self._context_builder.build(
             system_prompt=system_prompt,
             conversation_messages=history,
+            task_state=task_context,
+            memory_context=memory_context,
+            tools=tools,
         )
 
         # Agentic loop
@@ -597,8 +749,18 @@ class Orchestrator:
             iterations += 1
             logger.info("LLM iteration %d/%d", iterations, MAX_TOOL_ITERATIONS)
 
+            # Rebuild the context before EVERY LLM call: the in-memory
+            # messages now include assistant tool calls + tool results from
+            # previous iterations, and must re-enter the budget enforcement.
+            messages, tools, llm_max_tokens = await self._prepare_llm_call(
+                messages, tools,
+                system_prompt=system_prompt,
+                task_context=task_context,
+                memory_context=memory_context,
+            )
+
             # Call LLM (via provider or router)
-            response = await self._call_llm(messages=messages, tools=tools)
+            response = await self._call_llm(messages=messages, tools=tools, max_tokens=llm_max_tokens)
 
             # Handle LLM error
             if response.error_msg:
@@ -729,7 +891,7 @@ class Orchestrator:
             yield self._stream_event(OrchestratorMessageType.DONE, session_id=session_id, error=message)
             return
 
-        registry, tools = await self._build_tools_list()
+        registry, tools = await self._build_tools_list(query=cid_result["tool_name"])
 
         if not cid_result["approved"]:
             denied_msg_text = f"Action '{cid_result['tool_name']}' was denied by the user and was not executed."
@@ -797,9 +959,23 @@ class Orchestrator:
             device_capabilities=request.device_capabilities,
             available_tool_names=[t.function.name for t in tools],
         )
-        messages = self._context_builder.build(system_prompt=system_prompt, conversation_messages=history)
+        task_context = await self._build_task_context(session_id)
+        memory_context = await self._build_memory_context(cid_result["tool_name"])
+        messages = self._context_builder.build(
+            system_prompt=system_prompt,
+            conversation_messages=history,
+            task_state=task_context,
+            memory_context=memory_context,
+            tools=tools,
+        )
+        messages, tools, llm_max_tokens = await self._prepare_llm_call(
+            messages, tools,
+            system_prompt=system_prompt,
+            task_context=task_context,
+            memory_context=memory_context,
+        )
         acc = _StreamTurnAccumulator()
-        async for delta in self._iter_llm_stream(messages, tools, acc):
+        async for delta in self._iter_llm_stream(messages, tools, acc, max_tokens=llm_max_tokens):
             yield self._stream_event(OrchestratorMessageType.TEXT_DELTA, text=delta, session_id=session_id)
         failed = [r for r in results if not r.success]
         if acc.text:
@@ -887,7 +1063,9 @@ class Orchestrator:
         ))
 
         history = await self._conversation.get_context_window(session_id)
-        registry, tools = await self._build_tools_list()
+        task_context = await self._build_task_context(session_id)
+        memory_context = await self._build_memory_context(request.message)
+        registry, tools = await self._build_tools_list(query=request.message)
         system_prompt = build_system_prompt(
             device_id=request.device_id,
             device_capabilities=request.device_capabilities,
@@ -896,6 +1074,9 @@ class Orchestrator:
         messages = self._context_builder.build(
             system_prompt=system_prompt,
             conversation_messages=history,
+            task_state=task_context,
+            memory_context=memory_context,
+            tools=tools,
         )
 
         all_results = []
@@ -911,8 +1092,17 @@ class Orchestrator:
             iterations += 1
             logger.info("LLM streaming iteration %d/%d", iterations, MAX_TOOL_ITERATIONS)
 
+            # Same budget enforcement as process_message: rebuild before
+            # every streaming LLM call, no parallel budget logic.
+            messages, tools, llm_max_tokens = await self._prepare_llm_call(
+                messages, tools,
+                system_prompt=system_prompt,
+                task_context=task_context,
+                memory_context=memory_context,
+            )
+
             acc = _StreamTurnAccumulator()
-            async for delta in self._iter_llm_stream(messages, tools, acc):
+            async for delta in self._iter_llm_stream(messages, tools, acc, max_tokens=llm_max_tokens):
                 yield self._stream_event(
                     OrchestratorMessageType.TEXT_DELTA, text=delta, session_id=session_id,
                 )

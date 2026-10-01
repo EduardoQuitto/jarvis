@@ -191,6 +191,24 @@ class SQLiteMemoryProvider(BaseMemoryProvider):
             ON confirmations(session_id)
         """)
 
+        # Conversation compaction summaries (Phase 15.2).
+        # Stores deterministic summaries of compacted message ranges.
+        # The original messages are NEVER deleted — this is a representation.
+        await self._db.execute("""
+            CREATE TABLE IF NOT EXISTS conversation_summaries (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                conversation_id TEXT NOT NULL,
+                summary_text TEXT NOT NULL,
+                compacted_count INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (conversation_id) REFERENCES conversations(id)
+            )
+        """)
+        await self._db.execute("""
+            CREATE INDEX IF NOT EXISTS idx_conv_summaries_conv_id
+            ON conversation_summaries(conversation_id)
+        """)
+
         await self._db.commit()
 
     async def set(self, key: str, value: Any, category: str = "general") -> None:
@@ -632,3 +650,51 @@ class SQLiteMemoryProvider(BaseMemoryProvider):
                 {"key": row["key"], "value": json.loads(row["value"]), "category": row["category"]}
                 for row in rows
             ]
+
+    # --- Conversation summary methods (Phase 15.2) ---
+
+    async def save_conversation_summary(
+        self,
+        conversation_id: str,
+        summary_text: str,
+        compacted_count: int = 0,
+    ) -> int:
+        """Persist a compaction summary. Returns the new row id.
+
+        The original messages are never deleted — this is an additional
+        representation for context reconstruction after restart.
+        """
+        db = await self._get_connection()
+        now_str = datetime.now(timezone.utc).isoformat()
+        cursor = await db.execute(
+            """INSERT INTO conversation_summaries
+               (conversation_id, summary_text, compacted_count, created_at)
+               VALUES (?, ?, ?, ?)""",
+            (conversation_id, summary_text, compacted_count, now_str),
+        )
+        await db.commit()
+        return cursor.lastrowid
+
+    async def get_conversation_summaries(
+        self,
+        conversation_id: str,
+        limit: int = 10,
+    ) -> list:
+        """Get compaction summaries for a conversation, newest first."""
+        db = await self._get_connection()
+        async with db.execute(
+            """SELECT id, conversation_id, summary_text, compacted_count, created_at
+               FROM conversation_summaries
+               WHERE conversation_id = ?
+               ORDER BY id DESC LIMIT ?""",
+            (conversation_id, limit),
+        ) as cursor:
+            return [dict(row) for row in await cursor.fetchall()]
+
+    async def get_latest_conversation_summary(
+        self,
+        conversation_id: str,
+    ) -> Optional[dict]:
+        """Get the most recent compaction summary for a conversation."""
+        summaries = await self.get_conversation_summaries(conversation_id, limit=1)
+        return summaries[0] if summaries else None
