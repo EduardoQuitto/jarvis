@@ -1,5 +1,23 @@
 # J.A.R.V.I.S. — Roadmap de Desenvolvimento
 
+## Ressalva — Visão de Produto e Distribuição
+
+O J.A.R.V.I.S. está sendo desenvolvido com perspectiva de evolução futura para um produto distribuível e comercializável, podendo ser disponibilizado para empresas e consumidores finais.
+
+As decisões de arquitetura e implementação devem, sempre que possível, preservar essa possibilidade de evolução, evitando dependências desnecessárias de uma máquina, ambiente ou configuração exclusivamente local.
+
+A visão futura inclui:
+
+- sistema de contas e autenticação de usuários;
+- interface para conectar e gerenciar provedores e serviços externos, seguindo um modelo semelhante ao fluxo de conexão de provedores utilizado por ferramentas como o OpenCode;
+- gerenciamento de credenciais e configurações pela interface, reduzindo a dependência de edição manual de arquivos `.env`;
+- instalador do J.A.R.V.I.S. responsável por configurar automaticamente o ambiente, dependências, configurações, inicialização e componentes necessários;
+- distribuição para **Windows, Linux e macOS**;
+- instalação simplificada do **SERVER**, preferencialmente através de Docker;
+- possibilidade de distribuição do projeto como código, serviço para empresas ou produto destinado a consumidores finais.
+
+Esta visão não altera o escopo da fase atual nem antecipa a implementação desses recursos. Ela deve servir como **restrição arquitetural e direção de longo prazo**, para que decisões tomadas nas fases atuais não dificultem a futura transformação do J.A.R.V.I.S. em um produto instalável e distribuível.
+
 ## Fases do Projeto
 
 ### ✅ Fase 1: Fundação & Contratos (Concluída)
