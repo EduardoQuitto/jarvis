@@ -13,7 +13,7 @@ It is **not** a cloud chatbot. It is a local intelligence layer that runs on you
 
 ## Current Status
 
-**v0.6.1** (current) — **Phase 10 complete** (Security & Execution Boundary Hardening), operational CORE ↔ SERVER bridge, **Fase 11 complete** (real-time SSE streaming), **Fase 12 complete** (Central Server & Central State Authority: SERVER = gateway + source of truth, CORE = compute plane; Gemini key lives only on the SERVER relay), **Fase 15 complete** (Home Assistant SERVER-only integration, validated against a real server with Google Home voice control) and **Fase 15.1 complete** (13 GREEN utility tools: network, notifications, filesystem, security, math, diagnostics).
+**v0.6.2** (current) — **Phase 10 complete** (Security & Execution Boundary Hardening), operational CORE ↔ SERVER bridge, **Fase 11 complete** (real-time SSE streaming), **Fase 12 complete** (Central Server & Central State Authority: SERVER = gateway + source of truth, CORE = compute plane; Gemini key lives only on the SERVER relay), **Fase 15 complete** (Home Assistant SERVER-only integration, validated against a real server with Google Home voice control), **Fase 15.1 complete** (13 GREEN utility tools: network, notifications, filesystem, security, math, diagnostics) and **Fase 15.2 complete** (Context Architecture: provider-aware budget, deterministic tool selection, history compaction, per-call context rebuild; next is Fase 16 Local Voice Pipeline).
 
 ### Implemented
 

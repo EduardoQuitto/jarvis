@@ -280,3 +280,44 @@ class ConversationManager:
         except Exception:
             pass
         return None
+
+    # --- Compaction summary methods (Phase 15.2) ---
+
+    async def save_compaction_summary(
+        self,
+        session_id: str,
+        summary_text: str,
+        compacted_count: int = 0,
+    ) -> None:
+        """Persist a compaction summary for a session.
+
+        The original messages are never deleted — this is an additional
+        representation for context reconstruction after restart.
+        """
+        try:
+            mem = self._get_memory()
+            await mem.save_conversation_summary(
+                session_id, summary_text, compacted_count=compacted_count,
+            )
+        except Exception as e:
+            logger.warning("Failed to save compaction summary: %s", e)
+
+    async def get_compaction_summaries(
+        self,
+        session_id: str,
+        limit: int = 10,
+    ) -> List[dict]:
+        """Get compaction summaries for a session, newest first."""
+        try:
+            mem = self._get_memory()
+            return await mem.get_conversation_summaries(session_id, limit=limit)
+        except Exception:
+            return []
+
+    async def get_latest_compaction_summary(
+        self,
+        session_id: str,
+    ) -> Optional[dict]:
+        """Get the most recent compaction summary for a session."""
+        summaries = await self.get_compaction_summaries(session_id, limit=1)
+        return summaries[0] if summaries else None

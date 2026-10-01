@@ -105,6 +105,16 @@ class Settings(BaseSettings):
                     "For development, set JARVIS_CORS_ORIGINS='[\"http://localhost:3000\"]'.",
     )
 
+    # Context Architecture (Phase 15.2)
+    context_budget_enabled: bool = Field(default=True, description="Enable context budget management")
+    context_max_tokens: int = Field(default=8192, description="Maximum total tokens for LLM context (prompt + completion)")
+    context_response_reserve: int = Field(default=1024, description="Tokens reserved for LLM response")
+    context_compact_threshold: float = Field(default=0.7, description="Trigger compaction when context exceeds this fraction of budget")
+    context_compact_keep_recent: int = Field(default=10, description="Number of recent messages to preserve verbatim during compaction")
+    tool_selection_enabled: bool = Field(default=True, description="Enable deterministic tool context selection")
+    tool_selection_min_tools: int = Field(default=3, description="Minimum tools to always include in selection")
+    tool_selection_max_tools: int = Field(default=15, description="Maximum tools to send to the LLM")
+
     # Logging
     log_level: str = Field(default="INFO", description="Logging level")
 

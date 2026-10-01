@@ -5,6 +5,28 @@ All notable changes to the J.A.R.V.I.S. project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.2] - 2026-10-01
+
+### Added
+- **Phase 15.2 — Context Architecture (concluded):**
+  - Provider/model-aware context budget (`core/context/budget.py`): named sections (system prompt, task context, memory, history, tool definitions, response reserve) with safety margin; profiles for Ollama models and Gemini (qwen3.5:4b stays at 4096 total, never inflated).
+  - Deterministic tool selection (`core/context/tool_selector.py`): metadata/keyword scoring with safe fallback; active by default via `JARVIS_TOOL_SELECTION_ENABLED`; never authorizes execution (PolicyEngine remains the sole authority).
+  - Deterministic history compaction (`core/context/compaction.py`): threshold-triggered summaries persisted in `conversation_summaries`; original history never deleted.
+  - Context rebuild before every LLM call (`Orchestrator._prepare_llm_call`): first turn, post-tool-call iterations and streaming all re-enter budget enforcement; pair-aware history trim preserves valid assistant(tool_calls) → tool sequences and never drops the current user message.
+  - Tool definitions and tool calls counted in the budget via centralized estimators (`estimate_messages_tokens`, `estimate_tools_tokens`).
+  - `max_tokens` derived from the provider profile response reserve and transmitted on every LLM call (sync + streaming).
+  - New settings: `JARVIS_CONTEXT_BUDGET_ENABLED/MAX_TOKENS/RESPONSE_RESERVE/COMPACT_THRESHOLD/COMPACT_KEEP_RECENT`, `JARVIS_TOOL_SELECTION_ENABLED/MIN_TOOLS/MAX_TOOLS` (legacy pass-through when disabled).
+  - Regression fixed: qwen3.5:4b `finish_reason="length"` with 28 tool definitions — second LLM call now provably fits the budget (`tests/unit/test_context_rebuild.py`).
+  - Distributed validation: real CORE → SERVER → CORE/Ollama run preserved context integrity across the central state path.
+
+### Changed
+- Project version 0.6.1 → 0.6.2 (`pyproject.toml`, FastAPI app, MCP `serverInfo`); installed package metadata reinstalled to match.
+- `docs/ROADMAP.md`: Fase 15.2 recorded as concluded (15 = Home Assistant, 15.1 = Utility Tools, 15.2 = Context Architecture, 16 = Local Voice Pipeline next; Fase 14 stays skipped).
+- `README.md`, `docs/ARCHITECTURE.md`: current status and context architecture section.
+
+### Validation
+- 603 tests collected, 603 passed, 0 failed, 4 skipped (pre-existing Windows symlink skips); `compileall` clean; `git diff --check` clean.
+
 ## [0.6.1] - 2026-09-28
 
 ### Added

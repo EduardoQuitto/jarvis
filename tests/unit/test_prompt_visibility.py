@@ -84,10 +84,15 @@ async def test_local_prompt_still_lists_everything():
 
     orch = Orchestrator(router=_LocalRouter(provider))
     await orch.process_message(
-        OrchestratorRequest(message="hello", device_id="test-device")
+        OrchestratorRequest(message="please launch the calculator application",
+                            device_id="test-device")
     )
 
     registry = get_tool_registry()
     all_names = {t.name for t in registry.list_tools()}
-    assert {t.function.name for t in provider.seen_tools} == all_names
+    sent_names = {t.function.name for t in provider.seen_tools}
+    # Phase 15.2: tool selection is active, so only relevant tools are
+    # sent — but every sent tool must be advertised in the prompt.
+    assert sent_names and sent_names <= all_names
+    assert "launch_application" in sent_names
     assert "launch_application" in provider.seen_messages[0].content
