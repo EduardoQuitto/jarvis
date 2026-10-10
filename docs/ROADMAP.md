@@ -433,295 +433,154 @@ Acesso externo (fora de casa) continua futuro e não implementado: quando existi
 - [ ] O hardware deve continuar desacoplado do desenho de software.
 - [ ] O acesso externo futuro deve ocorrer por rede privada segura, nunca por exposição direta de serviços internos.
 - [ ] Autonomia deve aumentar a capacidade de executar objetivos mantendo supervisão e controle humano onde necessário.
+### Fase 28 — Auditoria da base e linha de referência confiável
 
-Complemento do ROADMAP do J.A.R.V.I.S.
-Como integrar: inserir este complemento em docs/ROADMAP.md imediatamente antes de ## Considerações Técnicas Transversais. Não substituir nem renumerar as fases existentes. As Fases 25, 26 e 27 já existem; este complemento começa na Fase 28. Depois de integrar, revisar referências a “próxima fase” no README e na documentação relacionada.
-Diretrizes de execução para IAs de desenvolvimento (OpenCode, ChatGPT e outras)
-Estas regras são instruções operacionais para qualquer IA que leia, planeje, edite, teste ou revise o repositório. O roadmap descreve a intenção do produto; o código, a configuração real e os resultados reproduzíveis dos testes determinam o que de fato funciona.
-Protocolo obrigatório para cada tarefa
-Ler antes de agir. Consultar docs/AGENTS.md, a fase relevante deste roadmap, docs/ARCHITECTURE.md, docs/DEPLOYMENT.md e os arquivos diretamente envolvidos. Conferir também o README, os testes e a configuração quando forem relevantes.
-Verificar o estado atual. Inspecionar branch/commit, mudanças locais, implementação, contratos, chamadores, dependências e testes. Não presumir que uma classe, endpoint ou comportamento documentado ainda corresponde ao código.
-Definir um escopo pequeno. Identificar a fase e o item tratado, o problema concreto, os arquivos prováveis, os riscos, as dependências e os critérios verificáveis de aceitação. Evitar refatorações desnecessárias e não misturar funcionalidades independentes.
-Preservar a base. Antes de editar, identificar como reverter a mudança. Usar branch isolada quando disponível; nunca descartar mudanças preexistentes do usuário. Preferir alterações localizadas a reescritas integrais de arquivos.
-Implementar com segurança. Reutilizar mecanismos existentes de autorização, confirmação, autenticação, visibilidade de tools e estado central. Não criar caminhos paralelos que os contornem.
-Testar o comportamento real. Incluir testes de sucesso, falha, limites de permissão, timeout/rede e regressões relevantes. Executar testes aplicáveis e a suíte completa quando viável. Informar comandos e resultados reais; nunca inventar testes executados ou validações operacionais.
-Atualizar documentação. Registrar configuração, limitações, migrações, segurança, recuperação e forma de validar. Atualizar badges e contagens somente a partir de resultados atuais.
-Entregar um relatório. Informar o que mudou, arquivos afetados, testes executados e resultados, o que não foi testado, riscos restantes e procedimento de rollback. Distinguir falha de código, teste preexistente, ambiente e infraestrutura sem ocultar a falha.
-Regras que nenhuma IA pode flexibilizar
-O SERVER permanece a autoridade do estado persistente e o gateway; o CORE executa processamento pesado. O hardware deve poder mudar sem exigir reescrita da arquitetura.
-O LLM não é fonte de verdade para estado de dispositivos, arquivos, rede, permissões ou execução. Esses dados devem vir de tools ou APIs reais, com origem e atualidade identificáveis.
-O modelo nunca concede permissões a si mesmo, altera a própria autorização nem transforma uma aprovação específica em autorização genérica. Reconhecer uma pessoa, dispositivo ou voz não prova autorização.
-Ações de alto impacto, financeiras, destrutivas, irreversíveis ou relacionadas à segurança exigem aprovação apropriada. Em caso de falha, o sistema deve restringir permissões, não ampliá-las.
-Não executar shell arbitrário construído pelo LLM, não expor serviços internos diretamente à Internet, não registrar segredos e não transferir chaves privadas para componentes que não devem possuí-las.
-Descobrir um nó ou dispositivo não o torna confiável nem autorizado. Aplicar autenticação, autorização e mínimo privilégio a cada chamada.
-Não guardar áudio, vídeo, dados biométricos brutos ou conteúdo sensível indefinidamente por padrão. Definir privacidade, retenção e exclusão.
-Não adicionar filas, banco vetorial, agentes, dependências ou serviços apenas por popularidade. Demonstrar necessidade e avaliar manutenção, licença, custo, compatibilidade e alternativas existentes.
-Não marcar uma tarefa como concluída porque o código foi escrito ou uma fase antiga declarava sucesso. Exigir critérios de aceitação e evidências adequadas. Testes unitários com mocks não substituem validação de uma integração real.
-Critério mínimo para marcar um item como concluído
-Um item só pode passar para [x] quando houver implementação correspondente, testes relevantes passando, documentação atualizada e evidência suficiente para o tipo de mudança. Para hardware e rede reais, testes isolados não substituem validação operacional. Quando algo não tiver sido verificado, manter pendente e declarar a limitação.
-🧭 Fase 28: Auditoria da Base e Linha de Referência Confiável (Prioridade imediata)
-Objetivo: descobrir o estado real do repositório antes de iniciar outra grande funcionalidade. Esta fase começa com leitura e testes; não autoriza refatorações funcionais em massa.
-[ ]
-Registrar branch, commit/HEAD, estado da árvore de trabalho e versões do ambiente, sem divulgar credenciais.
-[ ]
-Mapear entradas do SERVER e CORE, configuração, autenticação, comunicação remota, persistência, schema, startup/shutdown e ciclo de vida.
-[ ]
-Relacionar alegações importantes do README e roadmap ao código, testes e, quando aplicável, evidências de execução real.
-[ ]
-Executar a suíte disponível e ferramentas de validação configuradas. Registrar comandos, testes coletados, passados, falhos, ignorados e erros de coleta.
-[ ]
-Distinguir falha de código, teste desatualizado, diferença de ambiente, dependência ausente e integração ainda não executada.
-[ ]
-Revisar health check, API, ponte CORE/SERVER, estado central, confirmações, SQLite e falhas de rede.
-[ ]
-Inspecionar configurações perigosas por padrão, tratamento de secrets, logs e comportamento quando SERVER ou CORE ficam indisponíveis.
-[ ]
-Produzir relatório priorizado com evidências, arquivos/testes envolvidos e impacto.
-[ ]
-Definir a menor primeira correção, seus critérios de aceitação, testes de regressão e rollback antes de alterar código.
-[ ]
-Não marcar fases antigas como validadas sem verificar suas garantias; backup, restauração e segurança de produção exigem testes próprios.
-Critérios de conclusão: linha de base reproduzível, falhas categorizadas, fluxos críticos mapeados e primeira mudança pequena definida com testes e rollback. Uma leitura superficial ou testes simulados não bastam.
-🧪 Fase 29: Qualidade Contínua, Regressão e Documentação Consistente
-Objetivo: detectar regressões automaticamente e acabar com números ou estados documentados que não correspondam à execução real.
-[ ]
-Consolidar uma sequência reproduzível de validação local: dependências, testes, compilação e lint/type-check quando configurados ou justificados.
-[ ]
-Configurar CI para validações essenciais em commits/pull requests e plataformas oficialmente suportadas.
-[ ]
-Garantir isolamento do banco e do estado nos testes; a suíte comum não deve depender de dados reais, credenciais de produção ou APIs pagas.
-[ ]
-Criar ou corrigir testes contratuais para endpoints e DTOs críticos, autenticação, confirmação single-use, visibilidade das tools e erros.
-[ ]
-Separar testes unitários, integração simulada e validação operacional real; um mock não comprova a comunicação entre duas máquinas.
-[ ]
-Cobrir regressões de streaming, gateway, desconexão, timeouts, provider indisponível e ausência de CORE elegível.
-[ ]
-Sincronizar README, roadmap, guia de deploy, badges e contagem de testes a partir de uma execução registrada.
-[ ]
-Documentar como reproduzir falhas e executar subconjuntos sem ocultar dependências relevantes.
-[ ]
-Manter a suíte básica independente de hardware específico e de Internet, exceto testes explicitamente classificados como integrados.
-[ ]
-Registrar lacunas de cobertura em vez de representar cobertura desconhecida como completa.
-Critérios de conclusão: validação automatizada repetível, testes críticos confiáveis, documentação consistente e distinção explícita entre o que foi e o que não foi testado.
-🛡️ Fase 30: Segurança de Produção e Governança de Permissões
-Objetivo: endurecer a implantação sem criar um mecanismo de autorização paralelo às Fases 8 e 10.
-[ ]
-Definir modo de produção fail-closed: rejeitar chaves padrão/de desenvolvimento e configurações inseguras antes de aceitar tráfego.
-[ ]
-Validar debug, host/porta, CORS, autenticação e logs por ambiente; defaults de desenvolvimento não podem virar configuração de produção silenciosamente.
-[ ]
-Planejar e implementar rate limiting, limites de payload/concorrência, expiração e rotação de credenciais e respostas seguras para falhas de autenticação.
-[ ]
-Separar identidade do cliente, autenticação entre nós e autorização para cada ação. Uma chave compartilhada não pode significar permissão irrestrita.
-[ ]
-Formalizar mínimo privilégio por usuário, dispositivo, agente, plugin e tool; permitir revogar nós e dispositivos comprometidos.
-[ ]
-Garantir que credenciais não apareçam em prompts, saídas de tools, exceções, telemetria ou logs.
-[ ]
-Testar as fronteiras existentes: SSRF, redirects, acesso a LAN, traversal/symlinks, chamadas MCP e visibilidade SHARED/LOCAL_ONLY.
-[ ]
-Incluir testes negativos para prompt injection, falsificação/reuso de confirmação, uso cruzado de sessão e tentativa de privilégio excessivo.
-[ ]
-Documentar implantação segura por VPN/rede privada; nunca interpretar esta fase como autorização para expor API interna diretamente à Internet pública.
-[ ]
-Versionar mudanças nas políticas de segurança e manter procedimento de reversão.
-Critérios de conclusão: produção rejeita configuração insegura; permissões são verificadas por ação e origem; secrets não vazam pelos caminhos testados; implantação está documentada. Não alegar auditoria externa ou segurança absoluta sem evidência.
-♻️ Fase 31: Backups Verificados, Restauração e Recuperação de Desastres
-Objetivo: recuperar sistema e dados após falha de disco, corrupção, erro de atualização, exclusão ou comprometimento — e demonstrar isso com restaurações testadas.
-[ ]
-Classificar dados essenciais: SQLite, configurações necessárias, automações e metadados operacionais; separar caches e índices reconstruíveis.
-[ ]
-Implementar backup consistente para SQLite enquanto o banco está ativo; evitar cópias de arquivo que possam criar snapshots inconsistentes.
-[ ]
-Manter versões históricas em localização/dispositivo distinto quando possível, com cópia offline ou imutável e credenciais separadas.
-[ ]
-Proteger backups contra acesso não autorizado e ransomware; avaliar criptografia e testar acesso às respectivas chaves.
-[ ]
-Verificar integridade do backup e do banco restaurado, incluindo verificações próprias do SQLite quando aplicáveis.
-[ ]
-Restaurar em ambiente isolado e validar schema, conversas, tarefas, memória, dispositivos e tratamento de confirmações expiradas.
-[ ]
-Documentar reconstrução do SERVER em hardware limpo, configuração, recuperação e retorno seguro do CORE.
-[ ]
-Definir objetivos realistas de perda de dados aceitável e tempo de recuperação por serviço, com base em medições.
-[ ]
-Testar backup incompleto, corrupção, disco cheio, falta de permissão e incompatibilidade de schema.
-[ ]
-Diferenciar backup de sincronização e RAID; nenhum deles substitui um backup independente.
-[ ]
-Exigir aprovação explícita para restauração que sobrescreva ou descarte estado, com auditoria e plano de rollback.
-Critérios de conclusão: backup anterior pode ser localizado, verificado e restaurado de forma reproduzível. Registrar arquivos recuperados, resultado e tempo observado; criar o backup sozinho não basta.
-🖥️ Fase 32: Orquestração de Recursos e Compute Distribuído Consciente de Capacidade
-Objetivo: integrar os computadores disponíveis como infraestrutura coordenada, respeitando o papel e a capacidade real de cada nó.
-[ ]
-Definir contrato de capacidades do nó: papel, tipos de trabalho, CPU, RAM disponível, aceleradores, disco, latência, carga e instante da última atualização.
-[ ]
-Tratar heartbeat ausente, métricas antigas e capacidade desconhecida como incerteza, nunca como recurso garantido.
-[ ]
-Definir prioridades e limites por tipo de tarefa para manter o SERVER responsivo para gateway, persistência e automação.
-[ ]
-Roteiar tarefas segundo requisitos reais de modelo, memória, latência, privacidade, disponibilidade e custo; não fixar modelo ou hardware no código.
-[ ]
-Diferenciar paralelismo de tarefas independentes de paralelismo interno de um modelo, que só pode ser usado quando o runtime suportar.
-[ ]
-Adiar, rejeitar ou encaminhar trabalho quando faltar capacidade, explicando o motivo.
-[ ]
-Começar por despacho de novas tarefas; não migrar tarefas em execução até existir checkpoint, restauração de estado e testes de retomada.
-[ ]
-Usar telemetria e benchmarks existentes da Fase 23 sem criar router concorrente ao IntelligenceRouter.
-[ ]
-Preparar perfil All-in-One sem pressupor IPs distintos nem bifurcar contratos entre SERVER e CORE.
-[ ]
-Avaliar energia/custo apenas com dados reais e políticas explícitas; cálculo energético não deve bloquear tarefa crítica.
-[ ]
-Testar nós lentos, desconectados, sem memória ou heartbeat e validar operação em mais de uma máquina.
-Critérios de conclusão: seleção de nó explicável e mensurável, falhas sem perda silenciosa de tarefas e funções essenciais do SERVER preservadas. Migração live continua fora do escopo até ser uma entrega separada.
-🧠 Fase 33: Memória de Longo Prazo, Proveniência e Ciclo de Vida
-Objetivo: recuperar contexto útil ao longo de meses ou anos sem confundir memória antiga com estado atual nem apagar silenciosamente os registros de origem.
-[ ]
-Diferenciar memória episódica recente, eventos históricos, conhecimento semântico, estado temporário, preferências e intenções com prazo.
-[ ]
-Guardar, quando aplicável, origem, horário observado, última confirmação, confiança, contexto, escopo, retenção e status.
-[ ]
-Diferenciar fato observado, declaração do usuário, inferência, hipótese, previsão, intenção temporária e conteúdo não literal (como piada).
-[ ]
-Definir tratamento de memórias contraditórias, corrigidas, supersedidas ou desatualizadas sem reescrever o histórico de forma invisível.
-[ ]
-Implementar resumo/compactação e arquivamento reversíveis; resumo nunca deve ser apresentado como transcrição completa.
-[ ]
-Usar busca lexical e semântica conforme necessidade comprovada. Índices vetoriais devem ser reconstruíveis; estado central e auditoria não podem depender só de embeddings.
-[ ]
-Aplicar permissões à recuperação e impedir mistura de dados de diferentes usuários, sessões e contextos.
-[ ]
-Definir exportação, correção, exclusão, expiração e retenção mínima necessária, incluindo índices derivados e limites de backups.
-[ ]
-Proteger dados sensíveis em repouso e em trânsito e minimizar o contexto enviado a provedores externos.
-[ ]
-Testar recuperação de informação antiga, conflitos, expiração, exclusão, reinicialização e reconstrução de índices.
-Critérios de conclusão: proveniência identificável, distinção entre informação antiga e estado atual, retenção/exclusão documentadas e busca que respeita permissões.
-🌐 Fase 34: Modelo de Estado do Mundo e Gestão de Incerteza
-Objetivo: raciocinar sobre ambiente, sistema e contexto sem confundir observação com hipótese nem transformar confiança do modelo em autorização.
-[ ]
-Integrar Evidence & Verification Service da Fase 27 a observações reais de tools, APIs, Home Assistant, nós e memória.
-[ ]
-Representar afirmações com tipo, origem, instante, atualidade, contexto, confiança e evidências de suporte/conflito.
-[ ]
-Diferenciar explicitamente observado, inferido, previsto, planejado, intenção, desconhecido e desatualizado.
-[ ]
-Solicitar nova leitura quando a decisão depende de estado mutável e a última observação está vencida ou é insuficiente.
-[ ]
-Preservar conflitos entre fontes e resolver apenas com critérios explícitos; não usar votação ingênua entre modelos.
-[ ]
-Representar relações espaciais/temporais apenas quando houver dados ou inferências identificadas; nunca inventar localização ou estado real.
-[ ]
-Resolver incertezas com consultas seguras quando possível; perguntar ao usuário se a dúvida restante alterar materialmente a decisão.
-[ ]
-Separar percepção/verificação, planejamento e política de execução.
-[ ]
-Nunca usar confiança estimada, reconhecimento facial/voz ou conclusão de LLM como autorização.
-Critérios de conclusão: o JARVIS consegue indicar o que sabe e a origem, detecta dados obsoletos, preserva conflitos e não usa o modelo de estado para elevar permissões.
-🔔 Fase 35: Proatividade, Atenção e Aprendizado Seguro de Rotinas
-Objetivo: oferecer notificações, lembretes e sugestões úteis sem se tornar intrusivo nem executar rotinas perigosas por inferência frágil.
-[ ]
-Definir canais, horários silenciosos, urgência, frequência, cooldown e orçamento de atenção por usuário.
-[ ]
-Separar identificação de oportunidade, relevância, decisão de notificar e decisão de executar. Notificar não significa autorização.
-[ ]
-Aprender possíveis rotinas de eventos confiáveis, mantendo distinção entre padrão provável e regra confirmada pelo usuário.
-[ ]
-Começar com observação e sugestão; ativação automática requer opt-in e limiar de confiança verificável.
-[ ]
-Permitir execução sem nova confirmação apenas de ações de baixo risco explicitamente permitidas, com escopo, logs, aviso configurável e forma de pausar/desfazer.
-[ ]
-Encaminhar ações materiais ao PolicyEngine e, se necessário, ao ConfirmationManager; gatilhos críticos são avaliados deterministicamente, nunca por julgamento livre do LLM.
-[ ]
-Reutilizar Scheduler da Fase 26 e Home Assistant para gatilhos de tempo/evento, evitando timers concorrentes espalhados no código.
-[ ]
-Prevenir notificações duplicadas, loops, spam e reexecução acidental após reinício.
-[ ]
-Permitir consultar por que uma rotina foi sugerida, corrigir inferências, pausar e revogar a rotina.
-[ ]
-Testar falsos positivos, dados ausentes, horários silenciosos, duplicação de eventos e perda de rede.
-Critérios de conclusão: proatividade controlável e pouco intrusiva; execução limitada a ações autorizadas; gatilhos críticos determinísticos; rotinas podem ser pausadas e revogadas.
-🩺 Fase 36: Autocorreção Operacional e Evolução Controlada
-Objetivo: detectar e recuperar falhas sem permitir que um componente com falha seja o único responsável por declarar sua própria saúde ou remover seus limites.
-[ ]
-Criar supervisão de saúde com sinais independentes, timeouts e estados de degradação explícitos.
-[ ]
-Definir retry com backoff, circuit breaker, limites de tentativas e prevenção de loops.
-[ ]
-Distinguir reconexão/reinício seguro de alteração de schema, configuração, segurança, credenciais ou dados.
-[ ]
-Gerar diagnóstico baseado em eventos/logs redigidos; não afirmar causa raiz sem evidência.
-[ ]
-Para alterações de código, reutilizar a Fase 22: branch isolada, sandbox, patch pequeno, testes e revisão de dependências/licença/segurança.
-[ ]
-Testar a alteração em ambiente isolado antes da implantação e usar canário/implantação gradual quando possível.
-[ ]
-Verificar saúde pós-implantação e reverter quando critérios objetivos de falha forem atingidos.
-[ ]
-Exigir aprovação para mudanças sensíveis, destrutivas, de produção, segurança, credenciais, dados ou permissões.
-[ ]
-Proibir que o modelo enfraqueça PolicyEngine, remova logs, aumente sua própria permissão ou desative controles para “corrigir” uma falha.
-[ ]
-Auditar diagnóstico, patch, testes, autorização, implantação, resultado e rollback.
-[ ]
-Testar supervisor indisponível, rollback incompleto, patch que piora a saúde e queda prolongada de nós.
-Critérios de conclusão: detecção, recuperação e rollback reproduzíveis; ações sensíveis protegidas por aprovação; falhas visíveis; autocorreção incapaz de diminuir a segurança.
-📦 Fase 37: Bootstrap, Instalação e Perfis de Distribuição
-Objetivo: tornar instalação e recuperação repetíveis em computadores diferentes, mantendo a arquitetura comum e respeitando os recursos disponíveis.
-[ ]
-Definir limites compartilhados entre JARVIS SERVER, JARVIS AI NODE/CORE, JARVIS APP e JARVIS All-in-One.
-[ ]
-Detectar sistema operacional, arquitetura, memória, CPU, disco, aceleradores e dependências; distinguir requisitos obrigatórios de opcionais.
-[ ]
-Criar instalação guiada para pré-requisitos, configuração, inicialização e testes de saúde, mostrando progresso e erros compreensíveis.
-[ ]
-Preferir Docker para SERVER quando simplificar instalação/isolamento; não exigir Docker ou virtualização em alvos incompatíveis.
-[ ]
-Validar suporte real a Windows, Linux e macOS antes de declarar compatibilidade.
-[ ]
-Separar configuração, dados, logs, caches e segredos; não embutir .env, chaves ou tokens em pacotes e relatórios.
-[ ]
-Descobrir serviços/dispositivos sem ativá-los nem confiar neles automaticamente. Conectar, parear e conceder acesso requer autenticação/autorização.
-[ ]
-Incluir atualização, migração de schema, verificação pós-instalação, desinstalação e rollback, protegendo dados do usuário.
-[ ]
-Permitir All-in-One sem duplicar lógica nem pressupor endereços IP distintos entre SERVER e CORE.
-[ ]
-Preparar configuração de provedores por interface segura, reduzindo dependência de edição manual de .env, sem expor credenciais ao modelo.
-[ ]
-Documentar firewall, portas, backup inicial, primeiro login, atualização e diagnóstico. A instalação não abre exposição pública por padrão.
-Critérios de conclusão: instalação e atualização repetíveis nos ambientes testados; saúde verificada após instalação; dados sobrevivem a atualizações; falhas são recuperáveis sem exclusão silenciosa de dados.
-📱 Fase 38: Identidade, Sessões e Continuidade entre Dispositivos
-Objetivo: permitir que PC, voz, SERVER e celular sejam interfaces do mesmo assistente com sessões coerentes e autorização específica, sem mover desnecessariamente a execução para o telefone.
-[ ]
-Tratar o celular principalmente como interface de conversa, notificações e aprovações; processamento e execução ficam no SERVER/CORE, salvo capacidade móvel explicitamente planejada.
-[ ]
-Manter conversas e ações pendentes no backend central, associadas a usuário, sessão, dispositivo e pedido original.
-[ ]
-Mostrar em cada pedido de aprovação a ação, alvo, risco, contexto e efeito esperado. A aprovação deve ser específica, expirar e não virar autorização geral.
-[ ]
-Usar APIs biométricas do sistema operacional quando suportadas; o JARVIS não armazena imagens ou templates biométricos brutos.
-[ ]
-Definir reautenticação, bloqueio por inatividade, expiração de sessão e confirmação reforçada de ações sensíveis por política configurável.
-[ ]
-Revogar sessões e dispositivos perdidos/comprometidos sem revogar indiscriminadamente todos os outros nós.
-[ ]
-Evitar conteúdo sensível em notificações push e na tela bloqueada por padrão.
-[ ]
-Não tratar biometria local ou posse do telefone como autorização irrestrita para ferramentas e serviços de rede.
-[ ]
-Preservar continuidade ao trocar texto, voz, tela, PC e celular sem misturar sessões ou memória entre usuários.
-[ ]
-Testar sessão expirada, dispositivo revogado, aprovação repetida, notificação fora de ordem, perda de rede e retomada.
-Critérios de conclusão: o servidor aplica identidade e permissões a cada ação; aprovações são específicas e expiram; dispositivos podem ser revogados; troca de interface não duplica nem mistura estado.
-Ordem de execução e dependências
-A numeração organiza o roadmap, mas não substitui a análise de dependências. A próxima prioridade é a Fase 28 (auditoria), não iniciar uma nova funcionalidade só porque uma seção antiga a chama de “próxima”. A Fase 29 estabelece validação repetível. Mudanças de produção dependem da Fase 30; recuperação depende da Fase 31; autonomia e proatividade devem respeitar as Fases 30, 34 e 35. Dividir as fases 32–38 em entregas pequenas e só começar cada uma quando seus contratos e dependências estiverem estáveis.
----
+**Prioridade imediata.** Começar por inspeção e testes; não fazer uma refatoração grande nesta fase.
 
-### Nota sobre Hardware
+- [ ] Registrar branch, commit, estado da árvore de trabalho e versões do ambiente.
+- [ ] Mapear entradas do SERVER/CORE, configuração, autenticação, comunicação, persistência e ciclo de vida.
+- [ ] Relacionar alegações do README/roadmap ao código e aos testes.
+- [ ] Executar a suíte e registrar testes coletados, passados, falhos, ignorados e erros de coleta.
+- [ ] Distinguir defeito de código, teste desatualizado, problema de ambiente e integração ainda não testada.
+- [ ] Revisar API, ponte CORE/SERVER, estado central, confirmações, SQLite e falhas de rede.
+- [ ] Produzir lista priorizada de riscos com evidências e arquivos envolvidos.
+- [ ] Escolher uma primeira correção pequena, com critérios de aceitação, testes e rollback.
 
-O NODE 2 foi originalmente um Pentium G3260. Foi atualizado para um i5-7400 com 8 GB RAM, SSD ~222 GB e HDD 500 GB. O código é projetado para ser portátil e não é otimizado para hardware específico.
+**Concluída quando:** existe uma linha de base reproduzível, falhas estão categorizadas e a primeira correção pode ser feita com risco controlado.
+
+### Fase 29 — Qualidade contínua e regressão
+
+- [ ] Consolidar comandos reproduzíveis de testes e validações.
+- [ ] Configurar CI para verificações essenciais.
+- [ ] Isolar banco e estado nos testes.
+- [ ] Cobrir contratos, autenticação, confirmações, visibilidade de ferramentas e falhas.
+- [ ] Diferenciar mocks de integração simulada e validação operacional real.
+- [ ] Cobrir streaming, desconexão, timeouts e providers indisponíveis.
+- [ ] Manter README, roadmap, guia de deploy e contagens consistentes com resultados atuais.
+
+**Concluída quando:** a validação automatizada é repetível e a documentação não apresenta contagens sem evidência.
+
+### Fase 30 — Segurança de produção e governança de permissões
+
+- [ ] Rejeitar configurações de produção inseguras e chaves padrão.
+- [ ] Validar debug, bind de rede, CORS, autenticação e logging por ambiente.
+- [ ] Implementar limites de taxa, payload e concorrência quando necessários.
+- [ ] Definir expiração e rotação de credenciais.
+- [ ] Separar autenticação de nó da autorização por ação.
+- [ ] Aplicar mínimo privilégio por usuário, dispositivo, agente, plugin e ferramenta.
+- [ ] Testar SSRF, redirects, traversal, prompt injection e reuso indevido de confirmações.
+- [ ] Documentar implantação segura por VPN/rede privada.
+- [ ] Versionar mudanças e manter rollback.
+
+**Concluída quando:** o modo de produção falha com segurança diante de configurações inválidas e os limites de autorização são cobertos por testes negativos.
+
+### Fase 31 — Backups e recuperação de desastres
+
+- [ ] Classificar dados essenciais, caches e índices reconstruíveis.
+- [ ] Criar backups consistentes de SQLite.
+- [ ] Manter cópias históricas em outro dispositivo/local quando possível.
+- [ ] Proteger backups contra acesso indevido e ransomware.
+- [ ] Verificar integridade e executar restauração em ambiente isolado.
+- [ ] Documentar reconstrução do SERVER e retorno seguro do CORE.
+- [ ] Definir objetivos realistas de perda de dados e tempo de recuperação.
+- [ ] Testar corrupção, backup incompleto, disco cheio e incompatibilidade de schema.
+- [ ] Exigir autorização para restaurações que sobrescrevam estado.
+
+**Concluída quando:** um backup é localizado, verificado e restaurado de forma reproduzível. Criar backup sem testar restauração não basta.
+
+### Fase 32 — Orquestração de recursos distribuídos
+
+- [ ] Definir contrato de capacidades do nó: papel, CPU, RAM, aceleradores, disco, carga e atualização da telemetria.
+- [ ] Tratar heartbeat ausente e métricas antigas como capacidade desconhecida.
+- [ ] Preservar a responsividade do SERVER.
+- [ ] Roteiar tarefas por requisitos de memória, modelo, latência, privacidade e disponibilidade.
+- [ ] Diferenciar paralelismo de tarefas do paralelismo interno de um modelo.
+- [ ] Começar pelo despacho de novas tarefas; não migrar tarefas em execução sem checkpoint e retomada testados.
+- [ ] Reutilizar o IntelligenceRouter existente.
+- [ ] Preparar perfil All-in-One sem duplicar lógica.
+- [ ] Testar nós lentos, desconectados e sem recursos suficientes.
+
+**Concluída quando:** a seleção de nó é explicável, falhas não perdem tarefas silenciosamente e os serviços essenciais do SERVER permanecem disponíveis.
+
+### Fase 33 — Memória de longo prazo e proveniência
+
+- [ ] Diferenciar memória episódica, histórica, semântica, temporária, preferências e intenções.
+- [ ] Registrar origem, instante, última confirmação, confiança e retenção quando aplicável.
+- [ ] Diferenciar fatos, declarações, inferências, hipóteses, previsões e conteúdo não literal.
+- [ ] Tratar conflitos e dados desatualizados sem apagar o histórico silenciosamente.
+- [ ] Fazer compactação e arquivamento reversíveis.
+- [ ] Usar busca semântica apenas quando necessária; manter índices reconstruíveis.
+- [ ] Respeitar permissões e isolamento entre sessões.
+- [ ] Definir exportação, correção, exclusão e expiração.
+
+**Concluída quando:** a recuperação mostra proveniência e atualidade, respeita permissões e possui retenção/exclusão testadas.
+
+### Fase 34 — Estado do mundo e gestão de incerteza
+
+- [ ] Integrar evidências a observações reais de tools, APIs, Home Assistant, nós e memória.
+- [ ] Registrar origem, instante, atualidade, contexto e conflitos de afirmações.
+- [ ] Diferenciar observado, inferido, previsto, planejado, desconhecido e desatualizado.
+- [ ] Consultar novamente dados mutáveis quando necessário.
+- [ ] Resolver conflitos por critérios explícitos.
+- [ ] Não inventar localização, estado de dispositivo ou relações espaciais.
+- [ ] Perguntar ao usuário quando a incerteza restante mudar materialmente a decisão.
+- [ ] Nunca usar confiança do modelo como autorização.
+
+**Concluída quando:** o sistema informa o que sabe e de onde veio, detecta dados obsoletos e não transforma inferências em permissões.
+
+### Fase 35 — Proatividade e aprendizado seguro de rotinas
+
+- [ ] Definir canais, horários silenciosos, frequência e limites de notificação.
+- [ ] Separar sugestão, notificação e execução.
+- [ ] Aprender possíveis rotinas com evidências suficientes, sem tratar padrões como ordens confirmadas.
+- [ ] Começar com sugestões; automação exige opt-in e limiar verificável.
+- [ ] Automatizar apenas ações de baixo risco explicitamente autorizadas.
+- [ ] Usar PolicyEngine/ConfirmationManager para ações materiais.
+- [ ] Reutilizar scheduler e Home Assistant, evitando timers duplicados.
+- [ ] Prevenir loops, duplicações e excesso de notificações.
+- [ ] Permitir pausar, corrigir e revogar rotinas.
+
+**Concluída quando:** a proatividade é controlável, pouco intrusiva e não executa ações além das permissões concedidas.
+
+### Fase 36 — Autocorreção e evolução controlada
+
+- [ ] Criar supervisão de saúde com sinais independentes e timeouts.
+- [ ] Definir retry, backoff, circuit breaker e limites de tentativas.
+- [ ] Distinguir reinício seguro de alterações de segurança, credenciais ou dados.
+- [ ] Gerar diagnósticos baseados em evidências.
+- [ ] Usar branch isolada, sandbox, testes e revisão para patches.
+- [ ] Validar antes de implantar e reverter diante de falha objetiva.
+- [ ] Exigir aprovação para mudanças sensíveis ou destrutivas.
+- [ ] Proibir que o modelo enfraqueça políticas, remova logs ou aumente suas permissões.
+- [ ] Auditar diagnóstico, patch, autorização, implantação e rollback.
+
+**Concluída quando:** recuperação e rollback são reproduzíveis e a autocorreção não pode reduzir a segurança.
+
+### Fase 37 — Bootstrap, instalação e perfis de distribuição
+
+- [ ] Definir contratos comuns para SERVER, AI NODE/CORE, APP e All-in-One.
+- [ ] Detectar sistema operacional, CPU, RAM, disco, aceleradores e dependências.
+- [ ] Criar instalação guiada com progresso, diagnóstico e verificação de saúde.
+- [ ] Usar Docker no SERVER quando fizer sentido, sem exigir em plataformas incompatíveis.
+- [ ] Validar suporte real a Windows, Linux e macOS antes de declará-lo.
+- [ ] Separar dados, configuração, logs, caches e secrets.
+- [ ] Descobrir dispositivos sem confiar neles automaticamente.
+- [ ] Incluir atualização, migração, desinstalação e rollback sem apagar dados silenciosamente.
+- [ ] Permitir All-in-One sem duplicar a arquitetura.
+- [ ] Não abrir portas públicas por padrão.
+
+**Concluída quando:** instalação e atualização são repetíveis nos ambientes testados e falhas podem ser recuperadas com segurança.
+
+### Fase 38 — Identidade, sessões e continuidade entre dispositivos
+
+- [ ] Manter o celular como interface de conversa, notificações e aprovações; execução principal fica no SERVER/CORE.
+- [ ] Associar estado central a usuário, sessão, dispositivo e pedido.
+- [ ] Mostrar ação, alvo, risco e efeito esperado em cada aprovação.
+- [ ] Usar APIs biométricas do sistema operacional; não armazenar dados biométricos brutos.
+- [ ] Definir expiração de sessão, reautenticação e confirmação reforçada para ações sensíveis.
+- [ ] Permitir revogar dispositivos perdidos.
+- [ ] Evitar conteúdo sensível em notificações de tela bloqueada.
+- [ ] Não tratar biometria ou posse do telefone como autorização irrestrita.
+- [ ] Preservar continuidade sem misturar sessões entre usuários.
+
+**Concluída quando:** cada ação é autorizada no servidor, aprovações são específicas e expiram, e a troca de interface não mistura estado.
