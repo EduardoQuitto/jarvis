@@ -583,6 +583,313 @@ Acesso externo (fora de casa) continua futuro e não implementado: quando existi
 - [ ] Não tratar biometria ou posse do telefone como autorização irrestrita.
 - [ ] Preservar continuidade sem misturar sessões entre usuários.
 
+## Fases Complementares — Evolução do Jarvis como Agente Completo
+
+As fases a seguir complementam o roadmap existente para aproximar o J.A.R.V.I.S. das capacidades de produtividade, integração e experiência de uso de agentes modernos, incluindo o Hermes Agent.
+
+Essas fases não substituem as anteriores. Elas ampliam as capacidades do produto e devem reutilizar a arquitetura, os contratos, o estado central, o sistema de ferramentas e os mecanismos de segurança já estabelecidos.
+
+Toda implementação deverá começar pela análise do estado real do repositório. Antes de criar novos componentes, verificar o que já existe, o que funciona, o que está incompleto e o que pode ser reutilizado.
+
+### Fase 39 — Sistema de Skills e Aprendizado Procedimental
+
+**Objetivo:** permitir que o Jarvis transforme procedimentos úteis em habilidades reutilizáveis, carregadas sob demanda, para realizar tarefas recorrentes com mais eficiência, consistência e capacidade de recuperação.
+
+O sistema de skills deverá complementar o sistema de plugins, os agentes, a memória, o Planner e o Orchestrator. Uma skill representa um procedimento reutilizável; um plugin fornece capacidades ou ferramentas; a memória preserva informações relevantes. Esses conceitos não devem ser confundidos nem implementados como sistemas duplicados.
+
+#### Requisitos funcionais
+
+- [ ] Criar um formato padronizado para skills, com identificador, nome, descrição, versão, instruções, pré-requisitos, ferramentas necessárias e critérios de sucesso.
+- [ ] Permitir descobrir, listar, consultar, instalar, ativar, desativar, atualizar e remover skills.
+- [ ] Carregar instruções de uma skill somente quando forem relevantes para a tarefa, evitando consumir contexto desnecessariamente.
+- [ ] Permitir que uma skill seja criada a partir de um procedimento definido pelo usuário ou proposta pelo Jarvis após tarefas relevantes e recorrentes.
+- [ ] Separar instruções procedimentais de código executável e de permissões de acesso.
+- [ ] Identificar as ferramentas, os serviços e os recursos exigidos por cada skill.
+- [ ] Validar pré-requisitos antes da execução e verificar resultados após cada etapa relevante.
+- [ ] Permitir composição de skills em planos maiores, mantendo dependências, limites e critérios de conclusão.
+- [ ] Integrar skills ao Planner, GoalEngine, Orchestrator, ToolRegistry, memória central e sistema de tarefas existente.
+- [ ] Versionar habilidades, registrar sua origem e preservar histórico de alterações.
+- [ ] Permitir comparar versões, reverter atualizações e desativar habilidades problemáticas.
+- [ ] Registrar execuções, resultados, falhas e métricas de sucesso sem armazenar segredos indevidamente.
+- [ ] Permitir exportar e importar skills em formato documentado e compatível com ferramentas externas quando apropriado.
+- [ ] Avaliar compatibilidade com o padrão aberto Agent Skills antes de criar um formato proprietário desnecessário.
+
+#### Aprendizado e evolução de skills
+
+- [ ] Identificar procedimentos que se repetem ou que podem ser transformados em fluxos reutilizáveis.
+- [ ] Após tarefas relevantes, avaliar o resultado, identificar erros recorrentes e registrar lições úteis.
+- [ ] Permitir que o Jarvis proponha novas skills ou melhorias nas existentes.
+- [ ] Validar alterações em ambiente apropriado antes de disponibilizá-las.
+- [ ] Comparar resultados anteriores e posteriores para verificar se uma melhoria realmente aumentou a confiabilidade.
+- [ ] Evitar aprender automaticamente instruções maliciosas, ocasionais, incorretas ou incompatíveis com as políticas do sistema.
+- [ ] Não considerar uma execução bem-sucedida isolada como prova suficiente de que uma skill está correta.
+- [ ] Permitir revisão, aprovação, rejeição e reversão pelo usuário.
+- [ ] Garantir que o aprendizado não conceda novas permissões à skill, ao agente ou ao próprio Jarvis.
+
+#### Segurança
+
+- [ ] Toda skill deverá utilizar as permissões e ferramentas explicitamente autorizadas para a sessão e a tarefa.
+- [ ] Uma skill não poderá ignorar o PolicyEngine, o ConfirmationManager ou as regras de autenticação.
+- [ ] Instruções presentes em arquivos, páginas web e skills de terceiros deverão ser tratadas como conteúdo não confiável até serem validadas.
+- [ ] Skills não poderão obter credenciais, dados ou acesso a ferramentas além do escopo autorizado.
+- [ ] Alterações de código, execução de comandos perigosos e operações destrutivas deverão seguir os mecanismos de isolamento, aprovação e auditoria existentes.
+- [ ] O sistema deverá oferecer meios para identificar a origem de uma skill e avaliar seus requisitos antes da instalação.
+
+**Critérios de conclusão:**
+
+A fase será considerada concluída quando o Jarvis conseguir instalar, selecionar, executar, versionar, validar e reverter skills de forma reproduzível; quando skills forem reutilizáveis entre tarefas compatíveis; e quando todas as execuções permanecerem subordinadas às políticas de segurança existentes.
+
+### Fase 40 — Gateway Multiplataforma de Comunicação
+
+**Objetivo:** permitir que o usuário interaja com o Jarvis por diferentes canais de comunicação, preservando uma identidade, um estado central e uma política de segurança consistentes.
+
+O gateway deverá complementar a API, o aplicativo e a arquitetura de continuidade entre dispositivos. Não deverá criar uma segunda camada de memória, autenticação ou autorização independente do SERVER.
+
+#### Requisitos funcionais
+
+- [ ] Definir uma interface comum para adaptadores de canais de comunicação.
+- [ ] Implementar primeiro um canal de mensagens para validação ponta a ponta, escolhendo a plataforma conforme as necessidades e as condições de integração.
+- [ ] Preparar a arquitetura para canais adicionais, como Telegram, Discord, WhatsApp ou outros serviços compatíveis, sem exigir que todos sejam implementados na primeira entrega.
+- [ ] Encaminhar mensagens recebidas ao fluxo central de sessões, conversas, tarefas e execução.
+- [ ] Permitir enviar respostas, notificações, resultados, atualizações de progresso e solicitações de confirmação.
+- [ ] Suportar mensagens de texto e, conforme as capacidades de cada plataforma, imagens, arquivos e mensagens de voz.
+- [ ] Permitir relacionar uma mensagem recebida a um usuário, canal, dispositivo e sessão autorizados.
+- [ ] Preservar o histórico central mesmo quando a conversa mudar de canal, desde que a identidade e as permissões tenham sido verificadas.
+- [ ] Evitar a mistura de conversas, sessões ou dados pertencentes a usuários diferentes.
+- [ ] Tratar desconexões, limites de API, falhas de entrega, mensagens duplicadas e eventos fora de ordem.
+- [ ] Utilizar identificadores de operação e mecanismos de idempotência para evitar executar duas vezes uma ação devido à repetição de mensagens.
+- [ ] Permitir consultar o estado de entrega das notificações quando a plataforma disponibilizar essa informação.
+- [ ] Permitir desativar, desconectar e revogar o acesso de qualquer canal.
+- [ ] Documentar limitações, permissões necessárias, configuração e recuperação de cada integração.
+
+#### Aprovações e segurança
+
+- [ ] Todas as ações recebidas por canais externos deverão utilizar as mesmas políticas de segurança do aplicativo e da API.
+- [ ] Mensagens provenientes de um canal não deverão ser consideradas autorizadas apenas por conhecerem um identificador de conversa ou um nome de usuário.
+- [ ] Aprovações deverão estar vinculadas à identidade autorizada, à sessão, à ação e ao escopo correspondente.
+- [ ] Tokens de confirmação deverão continuar específicos, expiráveis e de uso controlado, sem serem aceitos indiscriminadamente entre canais.
+- [ ] Canais externos não poderão conceder permissões administrativas nem alterar as políticas do Jarvis.
+- [ ] A execução de ações sensíveis deverá utilizar os mecanismos de confirmação e autorização já existentes.
+- [ ] Notificações não deverão expor desnecessariamente informações sensíveis na tela bloqueada ou a destinatários incorretos.
+- [ ] Credenciais de integrações deverão ser armazenadas em local apropriado e nunca expostas em mensagens ou logs.
+- [ ] As permissões deverão poder ser limitadas por canal, usuário, grupo e tipo de ação, conforme suportado pela integração.
+
+#### Continuidade de sessão
+
+- [ ] Permitir continuar uma conversa por outro canal autorizado sem duplicar o estado central.
+- [ ] Manter referências aos objetivos, tarefas e confirmações relacionadas à conversa.
+- [ ] Revalidar a identidade quando necessário antes de expor informações ou permitir ações sensíveis.
+- [ ] Permitir interromper uma tarefa e consultar seu estado por qualquer interface autorizada.
+- [ ] Garantir que uma mensagem enviada por um canal não reinicie nem duplique silenciosamente uma tarefa que já esteja em execução.
+
+**Critérios de conclusão:**
+
+A fase será considerada concluída quando um canal implementado permitir conversar com o Jarvis, iniciar tarefas, acompanhar resultados e receber notificações utilizando o estado central do SERVER. A identidade, as permissões e as confirmações deverão permanecer válidas apenas dentro de seus escopos autorizados.
+
+Novos canais deverão poder ser adicionados por adaptadores independentes, sem duplicar a lógica principal do agente.
+
+### Fase 41 — Automação de Navegador e Web
+
+**Objetivo:** permitir que o Jarvis execute tarefas na web de maneira estruturada, verificável e segura, complementando a pesquisa online e o Computer Use existente.
+
+A automação deverá preferir interfaces estruturadas e APIs quando disponíveis. Mouse, teclado, captura de tela e OCR deverão funcionar como alternativas quando não houver uma interface mais confiável.
+
+#### Requisitos funcionais
+
+- [ ] Definir uma interface de navegador compatível com o sistema de ferramentas do Jarvis.
+- [ ] Permitir iniciar, consultar, controlar e encerrar sessões de navegador.
+- [ ] Permitir abrir URLs, navegar entre páginas, consultar títulos, identificar elementos, acessar links e inspecionar conteúdo relevante.
+- [ ] Permitir interagir com elementos e formulários de maneira estruturada.
+- [ ] Suportar múltiplas páginas e abas, mantendo uma identificação clara do contexto ativo.
+- [ ] Permitir preencher formulários, selecionar opções e realizar pesquisas em sites.
+- [ ] Permitir baixar e enviar arquivos quando a operação estiver autorizada e for compatível com a plataforma.
+- [ ] Integrar o estado do navegador ao contexto da tarefa para evitar confundir abas, páginas ou usuários.
+- [ ] Permitir utilizar automação visual como complemento para interfaces sem controles estruturados adequados.
+- [ ] Verificar o resultado de cada etapa importante, em vez de presumir que um clique ou comando funcionou.
+- [ ] Detectar mudanças de página, elementos inexistentes, carregamentos incompletos e sessões expiradas.
+- [ ] Permitir interromper, retomar quando seguro e replanejar uma sequência de navegação.
+- [ ] Registrar etapas relevantes, resultados, falhas e evidências, respeitando as políticas de privacidade.
+- [ ] Integrar a automação ao Planner, Orchestrator, sistema de tarefas e serviço de verificação de evidências.
+- [ ] Evitar desenvolver um navegador próprio quando uma solução mantida e compatível puder ser integrada de forma segura.
+
+#### Segurança e isolamento
+
+- [ ] Manter sessões de navegador isoladas conforme o usuário, a tarefa e o nível de confiança.
+- [ ] Definir limites de acesso a domínios, arquivos, rede e downloads.
+- [ ] Tratar páginas, documentos e instruções encontradas na internet como fontes potencialmente não confiáveis.
+- [ ] Impedir que instruções de páginas web alterem as políticas de segurança, concedam permissões ou autorizem ações no sistema operacional.
+- [ ] Não disponibilizar automaticamente credenciais pessoais, cookies ou sessões autenticadas a qualquer tarefa.
+- [ ] Proteger contra acesso a endereços internos sensíveis, serviços de metadados e recursos não autorizados.
+- [ ] Classificar as ações de navegador usando o PolicyEngine.
+- [ ] Exigir confirmação apropriada para ações materiais, como publicar conteúdo, enviar comunicações, fazer compras, modificar configurações de conta ou realizar operações irreversíveis.
+- [ ] Limitar frequência, concorrência e duração das operações.
+- [ ] Permitir encerrar sessões, apagar dados temporários e revogar acessos.
+- [ ] Garantir que downloads e arquivos obtidos durante a navegação não sejam executados automaticamente.
+
+#### Integração com Computer Use
+
+- [ ] Reutilizar a separação entre percepção, planejamento e execução estabelecida na Fase 21.
+- [ ] Preferir APIs, seletores e controles estruturados antes de mouse e teclado.
+- [ ] Quando a interação visual for necessária, verificar o contexto da tela antes de executar cada ação relevante.
+- [ ] Tratar OCR e análise visual como evidência de contexto, nunca como autorização.
+- [ ] Aplicar as mesmas políticas de segurança independentemente da técnica de automação utilizada.
+- [ ] Registrar de forma diferenciada as ações estruturadas e as ações baseadas em coordenadas visuais.
+
+**Critérios de conclusão:**
+
+A fase será considerada concluída quando o Jarvis conseguir executar um fluxo web de várias etapas, verificar os resultados, tratar erros comuns, interromper a tarefa com segurança e registrar evidências suficientes para explicar o que ocorreu.
+
+Os testes deverão incluir páginas alteradas, falhas de rede, sessões expiradas, permissões negadas, conteúdo malicioso e tentativas de ultrapassar os limites de acesso.
+
+---
+
+## Requisitos Complementares para Fases Existentes
+
+Os itens a seguir ampliam as fases já presentes no roadmap. Eles não exigem a criação de sistemas duplicados e deverão ser implementados dentro das fases correspondentes, conforme suas dependências e prioridades.
+
+### Complementos à Fase 24 — Plugin System e Interoperabilidade
+
+- [ ] Avaliar e implementar um cliente MCP para conexão com servidores de ferramentas compatíveis.
+- [ ] Suportar os transportes necessários, priorizando servidores locais e conexões remotas seguras.
+- [ ] Permitir descobrir, listar, atualizar e desconectar ferramentas fornecidas por servidores MCP.
+- [ ] Criar uma interface de configuração e gerenciamento das conexões.
+- [ ] Definir autenticação, autorização e armazenamento protegido de credenciais quando aplicáveis.
+- [ ] Separar o papel do servidor MCP do papel do cliente MCP.
+- [ ] Permitir registrar a origem, as capacidades e os requisitos de cada integração.
+- [ ] Definir um catálogo de plugins e integrações aprovadas, com versões, documentação e histórico de atualização.
+- [ ] Exigir autorização individual das capacidades materiais, sem conceder acesso irrestrito por instalar um plugin.
+- [ ] Garantir que ferramentas descobertas dinamicamente passem pelos mesmos controles de visibilidade e autorização.
+- [ ] Permitir desativar e remover integrações sem deixar credenciais ou processos órfãos.
+- [ ] Não confiar automaticamente em ferramentas ou servidores MCP apenas porque o protocolo é compatível.
+
+**Critérios adicionais de conclusão:** deve ser possível conectar e desconectar uma integração compatível, descobrir suas ferramentas, controlar seu acesso e executar chamadas autorizadas com auditoria e tratamento de falhas.
+
+### Complementos à Fase 26 — Scheduler Foundation
+
+- [ ] Registrar o histórico de cada execução, incluindo horário, duração, resultado, erros e tentativas.
+- [ ] Diferenciar tarefa agendada, execução iniciada, execução concluída, execução falha e entrega de notificação não confirmada.
+- [ ] Evitar execução duplicada quando houver reinicialização, repetição de eventos ou indisponibilidade temporária.
+- [ ] Implementar políticas de retry, backoff, expiração e limites de tentativas.
+- [ ] Recuperar o estado das tarefas após reinicialização sem repetir automaticamente operações materiais que já possam ter sido executadas.
+- [ ] Definir claramente fuso horário, recorrência, próxima execução e comportamento durante mudanças de horário.
+- [ ] Permitir listar, pausar, retomar, editar, executar agora e remover tarefas.
+- [ ] Permitir cancelamento seguro quando a tarefa estiver em execução.
+- [ ] Notificar o usuário sobre falhas persistentes e problemas de entrega quando apropriado.
+- [ ] Garantir que tarefas recorrentes reutilizem as políticas de autorização e confirmação.
+- [ ] Reutilizar o estado central do SERVER e evitar schedulers independentes em cada nó sem necessidade comprovada.
+
+**Critérios adicionais de conclusão:** tarefas deverão manter um histórico verificável, sobreviver a reinicializações dentro das garantias documentadas e distinguir claramente sucesso operacional de entrega não confirmada.
+
+### Complementos à Fase 30 — Segurança e Isolamento Geral de Execução
+
+- [ ] Definir ambientes isolados para executar código gerado, plugins não confiáveis e tarefas que exijam acesso ao sistema operacional.
+- [ ] Avaliar containers ou outros mecanismos de isolamento apropriados para os sistemas suportados.
+- [ ] Separar as permissões de execução local, execução remota e execução em ambientes isolados.
+- [ ] Aplicar limites de CPU, memória, tempo, processos e armazenamento temporário.
+- [ ] Controlar o acesso ao sistema de arquivos e à rede dentro do ambiente de execução.
+- [ ] Impedir que tarefas não confiáveis recebam automaticamente credenciais, tokens ou variáveis de ambiente sensíveis.
+- [ ] Definir o ciclo de vida dos ambientes isolados, incluindo criação, encerramento, limpeza e retenção.
+- [ ] Bloquear escape de sandbox como requisito explícito de testes de segurança, dentro dos mecanismos adotados.
+- [ ] Registrar origem, permissões, ambiente utilizado, resultados e falhas das execuções.
+- [ ] Exigir confirmação ou bloquear ações fora do escopo permitido.
+- [ ] Não considerar containers, sandbox ou aprovação de comandos como substitutos da autorização central.
+- [ ] Documentar quais tipos de isolamento estão realmente disponíveis em cada plataforma suportada.
+
+**Critérios adicionais de conclusão:** código e tarefas não confiáveis deverão operar com os privilégios mínimos necessários, limites técnicos verificáveis e impossibilidade de acessar automaticamente recursos externos ao escopo autorizado.
+
+### Complementos à Fase 33 — Memória e Pesquisa de Histórico
+
+- [ ] Disponibilizar pesquisa textual em conversas anteriores, além de pesquisa semântica.
+- [ ] Recuperar mensagens originais com referência à conversa, data, sessão e contexto relevante.
+- [ ] Permitir filtrar resultados por projeto, assunto, período, tarefa ou ferramenta quando houver metadados adequados.
+- [ ] Integrar os resultados da pesquisa ao contexto de tarefas atuais sem carregar todo o histórico desnecessariamente.
+- [ ] Fazer resumos de memória apontarem para as fontes que os originaram, quando possível.
+- [ ] Permitir inspecionar, corrigir, exportar e excluir memórias.
+- [ ] Diferenciar exclusão da memória resumida da exclusão do histórico original.
+- [ ] Aplicar os mesmos limites de autorização e isolamento a toda pesquisa.
+- [ ] Permitir reconstruir o contexto relevante de uma tarefa antiga usando dados persistidos e verificáveis.
+- [ ] Manter índices pesquisáveis reconstruíveis a partir dos dados de origem quando apropriado.
+
+**Critérios adicionais de conclusão:** o usuário deverá conseguir localizar uma informação antiga, consultar a fonte original e utilizar o contexto recuperado em uma nova tarefa, sem misturar sessões ou expor dados não autorizados.
+
+### Complementos às Fases 35 e 36 — Ciclo de Aprendizado e Melhoria
+
+- [ ] Integrar avaliação de resultados, memória, skills, métricas e autocorreção em um processo controlado.
+- [ ] Após tarefas relevantes, comparar o resultado real com os critérios de sucesso.
+- [ ] Registrar causas prováveis de falha, alternativas tentadas e soluções confirmadas.
+- [ ] Identificar lições que possam ser reutilizadas sem armazenar dados desnecessários.
+- [ ] Permitir que o Jarvis proponha atualizações de skills, procedimentos ou planos de execução.
+- [ ] Testar melhorias antes de promovê-las para uso recorrente.
+- [ ] Medir os resultados de melhorias em tarefas representativas.
+- [ ] Não alterar automaticamente permissões, políticas, credenciais ou mecanismos críticos de segurança.
+- [ ] Permitir aprovação, rejeição, revisão e reversão de mudanças.
+- [ ] Manter rastreabilidade entre o problema identificado, a mudança proposta, os testes e os resultados posteriores.
+
+**Critérios adicionais de conclusão:** o Jarvis deverá demonstrar um ciclo reproduzível de avaliação e melhoria que aumente a confiabilidade sem reduzir a segurança ou modificar permissões por conta própria.
+
+### Complementos à Fase 37 — Instalação, Configuração e Administração
+
+- [ ] Criar uma interface administrativa para configurar e monitorar os componentes principais do Jarvis.
+- [ ] Permitir conectar, desconectar e configurar provedores de IA por um fluxo guiado.
+- [ ] Validar credenciais e conectividade antes de habilitar provedores externos.
+- [ ] Exibir os modelos disponíveis, capacidades relevantes, limitações e estado de saúde dos provedores.
+- [ ] Permitir configurar preferências de roteamento por tipo de tarefa, respeitando as políticas de privacidade.
+- [ ] Exibir nós conectados, recursos disponíveis, serviços ativos e tarefas em execução.
+- [ ] Disponibilizar gestão de plugins, servidores MCP, skills e canais de comunicação.
+- [ ] Disponibilizar histórico de tarefas, aprovações pendentes, erros e diagnósticos.
+- [ ] Permitir consultar e gerenciar permissões, sessões e dispositivos autorizados.
+- [ ] Disponibilizar ferramentas de backup, validação de integridade e acompanhamento da recuperação.
+- [ ] Exibir latência, falhas, consumo de tokens e custos estimados quando esses dados estiverem disponíveis.
+- [ ] Garantir que os segredos sejam protegidos e nunca apresentados em logs ou no contexto enviado aos modelos.
+- [ ] Permitir executar diagnósticos, verificar dependências e acompanhar atualizações.
+- [ ] Manter alternativas por linha de comando para recuperação e administração quando a interface estiver indisponível.
+- [ ] Validar a experiência de instalação e administração em cada plataforma declarada como suportada.
+
+**Critérios adicionais de conclusão:** operações rotineiras de configuração, diagnóstico e manutenção deverão ser possíveis por uma interface documentada, sem exigir edição manual de arquivos para cada alteração comum.
+
+### Complementos à Fase 38 — Continuidade de Uso e Controle de Tarefas
+
+- [ ] Permitir consultar e acompanhar tarefas por interfaces autorizadas.
+- [ ] Exibir progresso, etapa atual, dependências, erros e confirmações pendentes.
+- [ ] Permitir pausar, cancelar e retomar tarefas quando o estado e as operações envolvidas tornarem isso seguro.
+- [ ] Garantir que uma interrupção não deixe subprocessos ou ações materiais executando silenciosamente.
+- [ ] Permitir enviar novas instruções para tarefas em andamento sem misturar sessões.
+- [ ] Exibir ferramentas utilizadas e resultados relevantes de forma compreensível.
+- [ ] Permitir consultar evidências associadas ao resultado final.
+- [ ] Preservar a continuidade entre canais e dispositivos sem ignorar reautenticação ou requisitos de confirmação.
+- [ ] Garantir que a indisponibilidade de uma interface não apague nem invalide o estado central da tarefa.
+
+**Critérios adicionais de conclusão:** o usuário deverá conseguir entender o que o Jarvis está fazendo, interromper operações compatíveis, consultar resultados e recuperar o estado após desconexões ou reinicializações, sem gerar execução duplicada ou perda silenciosa de progresso.
+
+---
+
+## Ordem Recomendada de Implementação das Extensões
+
+As fases complementares deverão respeitar as dependências da arquitetura e não deverão provocar uma reescrita desnecessária do projeto.
+
+1. **Concluir e validar a fundação:** executar a auditoria da Fase 28, estabilizar os testes da Fase 29 e corrigir riscos prioritários.
+2. **Fortalecer a operação:** aprimorar segurança, isolamento, scheduler, memória pesquisável, gestão de integrações e experiência administrativa.
+3. **Implementar o sistema de skills:** aproveitar ferramentas, agentes, memória, plugins e critérios de validação já existentes.
+4. **Implementar o gateway de comunicação:** iniciar com um canal, validar identidade, sessões, tarefas e aprovações e então expandir.
+5. **Implementar a automação de navegador:** integrar ferramentas estruturadas, isolamento, permissões e verificação de resultados.
+6. **Validar a integração completa:** testar fluxos de ponta a ponta, incluindo falhas, retomada, concorrência, ausência de rede e ações negadas.
+7. **Medir resultados reais:** utilizar métricas, benchmarks reproduzíveis e tarefas representativas para decidir quais melhorias adicionais realmente se justificam.
+
+Não é necessário implementar todas as integrações ao mesmo tempo. A arquitetura deverá permitir acrescentá-las de maneira incremental, documentada e testável.
+
+## Critério Geral de Conclusão das Extensões
+
+As novas capacidades não deverão ser declaradas concluídas apenas porque existem classes, endpoints, interfaces ou testes unitários.
+
+Cada capacidade deverá demonstrar um fluxo funcional de ponta a ponta, com estado persistente quando necessário, permissões verificadas, tratamento de falhas, evidências do resultado e documentação atualizada.
+
+Mocks podem validar componentes isolados, mas não substituem a validação operacional de integrações reais.
+
+O Jarvis deverá manter a mesma autoridade central, as mesmas políticas de segurança e o mesmo modelo de auditoria independentemente da quantidade de ferramentas, skills, canais ou nós disponíveis.
+
+**Princípio permanente:** ampliar as capacidades do Jarvis sem duplicar responsabilidades, enfraquecer as políticas de segurança ou transformar funcionalidades ainda não validadas em promessas de funcionamento.
+---
+
 **Concluída quando:** cada ação é autorizada no servidor, aprovações são específicas e expiram, e a troca de interface não mistura estado.
 
 ## Visão Final — O Jarvis após a conclusão de todas as fases
