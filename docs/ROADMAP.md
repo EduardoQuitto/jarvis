@@ -584,3 +584,231 @@ Acesso externo (fora de casa) continua futuro e não implementado: quando existi
 - [ ] Preservar continuidade sem misturar sessões entre usuários.
 
 **Concluída quando:** cada ação é autorizada no servidor, aprovações são específicas e expiram, e a troca de interface não mistura estado.
+
+## Visão Final — O Jarvis após a conclusão de todas as fases
+
+### 1. Objetivo principal
+
+Ao final de todas as fases, o Jarvis deverá ser um assistente pessoal inteligente, persistente, multimodal, proativo, modular e distribuído, capaz de compreender meus objetivos, utilizar os recursos disponíveis, executar tarefas autorizadas, aprender minhas preferências e me ajudar a administrar atividades digitais e dispositivos conectados.
+
+O Jarvis não deverá ser apenas um chatbot que responde perguntas. Ele deverá funcionar como um sistema integrado capaz de transformar solicitações em planos, planos em ações autorizadas, ações em resultados verificáveis e resultados em conhecimento útil para o futuro.
+
+Seu objetivo será me ajudar a estudar, programar, desenvolver projetos, organizar informações, administrar computadores e serviços, automatizar tarefas e controlar dispositivos compatíveis, sempre respeitando minhas permissões, minha privacidade e minhas decisões.
+
+O Jarvis deverá funcionar como um assistente contínuo, e não como uma ferramenta que esquece tudo a cada conversa.
+
+### 2. Arquitetura integrada e distribuída
+
+O Jarvis deverá funcionar por meio de uma arquitetura modular, na qual cada componente tenha responsabilidades claras.
+
+- **SERVER:** será o centro de controle do sistema, responsável pela API, autenticação, autorização, estado persistente, memória central, gerenciamento dos nós, coordenação de tarefas, confirmações, auditoria e comunicação entre componentes.
+- **CORE / AI NODE:** será responsável pelo processamento de inteligência artificial, raciocínio, planejamento, interpretação multimodal e execução dos componentes de IA. Poderá utilizar o computador principal, o servidor ou outros nós disponíveis, conforme os requisitos de cada tarefa.
+- **APP:** será a interface principal do usuário, especialmente no celular, permitindo conversar com o Jarvis, receber notificações, acompanhar tarefas, fornecer informações e aprovar ou rejeitar ações.
+- **Nós adicionais:** computadores e outros equipamentos autorizados poderão fornecer CPU, memória, aceleradores, armazenamento ou serviços específicos.
+- **Integrações e ferramentas:** módulos especializados poderão conectar o Jarvis a sistemas operacionais, arquivos, aplicações, serviços online, APIs, Home Assistant e outros sistemas compatíveis.
+
+Todos esses componentes deverão trabalhar como um único sistema, mesmo quando estiverem em dispositivos diferentes. O usuário não deverá precisar compreender toda a complexidade interna para utilizar o Jarvis.
+
+O SERVER deverá permanecer como autoridade sobre o estado persistente e as permissões. Os demais componentes não poderão se tornar fontes independentes e conflitantes de verdade.
+
+### 3. Conversação natural e capacidades multimodais
+
+O Jarvis deverá permitir uma interação natural por texto e, conforme os módulos estiverem implementados e disponíveis, por voz, imagens e outros tipos de entrada multimodal.
+
+Deverá conseguir:
+
+- Compreender perguntas, solicitações, instruções e objetivos compostos por várias etapas.
+- Utilizar o contexto da conversa e as memórias relevantes para evitar perguntas repetitivas.
+- Explicar o que está fazendo e apresentar resultados de maneira clara.
+- Identificar quando não possui informações suficientes e solicitar esclarecimentos quando isso realmente fizer diferença.
+- Reconhecer limitações e distinguir fatos observados de inferências.
+- Adaptar o nível de detalhe, o tom e a forma de comunicação às preferências do usuário.
+- Interromper, pausar ou replanejar uma tarefa quando receber novas instruções.
+
+A experiência deverá ser fluida: o usuário poderá iniciar uma atividade no computador, continuar pelo celular e consultar posteriormente o histórico sem perder a continuidade, respeitando as permissões e o isolamento das sessões.
+
+### 4. Memória persistente e conhecimento contextual
+
+O Jarvis deverá manter uma memória útil entre conversas e reinicializações. As informações deverão ser organizadas de forma que possam ser consultadas, atualizadas, corrigidas, exportadas ou excluídas.
+
+A memória deverá distinguir, conforme aplicável:
+
+- Informações recentes das conversas.
+- Preferências recorrentes e configurações do usuário.
+- Projetos, objetivos, decisões e tarefas em andamento.
+- Conhecimento consolidado e fatos relevantes.
+- Eventos, ações executadas e seus respectivos resultados.
+- Rotinas identificadas e comportamentos que ainda precisam de confirmação.
+
+As informações importantes deverão ter origem e contexto identificáveis. O Jarvis não deverá tratar uma hipótese como fato confirmado nem considerar permanentemente atual uma informação que possa ter mudado.
+
+Quando encontrar informações contraditórias, deverá reconhecer o conflito, avaliar as evidências disponíveis e solicitar ajuda quando não houver uma resolução confiável.
+
+A memória não deverá crescer descontroladamente. O sistema deverá organizar, resumir, arquivar e remover informações de acordo com políticas claras de relevância, retenção e privacidade, sem apagar silenciosamente dados importantes.
+
+### 5. Planejamento e execução de tarefas
+
+O Jarvis deverá ser capaz de receber objetivos e transformá-los em tarefas executáveis.
+
+Para cada tarefa relevante, deverá conseguir:
+
+1. Compreender o objetivo e os critérios de sucesso.
+2. Identificar informações, ferramentas, permissões e recursos necessários.
+3. Planejar uma sequência de etapas.
+4. Avaliar riscos, custos, disponibilidade e incertezas.
+5. Executar as ações permitidas.
+6. Verificar os resultados por meio de evidências reais.
+7. Corrigir falhas recuperáveis ou apresentar alternativas.
+8. Comunicar o resultado final e registrar as informações importantes.
+
+Tarefas maiores deverão ser divididas em etapas menores, com progresso observável e possibilidade de cancelamento.
+
+Quando houver dependências, falhas ou falta de recursos, o Jarvis deverá ajustar o plano em vez de fingir que concluiu a atividade.
+
+O sistema poderá utilizar agentes especializados para tarefas diferentes, mas deverá manter coordenação central, limites de permissão e rastreabilidade. A criação de múltiplos agentes não deverá duplicar responsabilidades nem conceder autonomia irrestrita a cada um.
+
+### 6. Uso inteligente de modelos e recursos computacionais
+
+O Jarvis deverá selecionar os recursos de inteligência artificial de acordo com as características de cada tarefa, considerando qualidade necessária, latência, custo, privacidade, conectividade e recursos disponíveis.
+
+Quando adequado, poderá utilizar modelos locais e gratuitos. Quando necessário e autorizado, poderá recorrer a APIs ou modelos externos.
+
+O sistema deverá avaliar as capacidades reais de cada nó e encaminhar tarefas de acordo com seus requisitos. Não deverá enviar automaticamente uma tarefa para um computador sem memória suficiente, para um serviço indisponível ou para um provedor incompatível.
+
+O funcionamento distribuído deverá permitir expansão gradual: adicionar um computador ou serviço compatível deverá aumentar as capacidades do sistema sem exigir uma reconstrução completa da arquitetura.
+
+A indisponibilidade de um nó ou provedor deverá provocar uma resposta controlada. O Jarvis poderá tentar novamente, selecionar um recurso alternativo ou informar que não consegue prosseguir.
+
+Não deverá afirmar que executou uma tarefa quando não houver confirmação confiável do resultado.
+
+### 7. Autonomia, proatividade e controle do usuário
+
+O Jarvis deverá ser proativo. Poderá identificar tarefas pendentes, oportunidades relevantes, possíveis problemas e rotinas úteis, apresentando sugestões no momento adequado.
+
+Entretanto, sua autonomia deverá seguir uma política explícita de risco e autorização.
+
+- **Ações de baixo risco:** poderão ser executadas automaticamente quando houver permissão explícita e critérios definidos.
+- **Ações com consequências relevantes:** deverão respeitar as regras de confirmação estabelecidas para a categoria da ação.
+- **Ações sensíveis, destrutivas, irreversíveis, financeiras ou de alto risco:** deverão exigir autorização apropriada antes da execução.
+- **Ações sem permissão ou incompatíveis com as políticas:** deverão ser bloqueadas.
+
+As confirmações deverão informar claramente o que será feito, em qual recurso, com qual consequência e dentro de quais limites. Uma autorização deverá ser específica, verificável e limitada ao tempo ou ao escopo previsto.
+
+O Jarvis deverá aprender possíveis rotinas com o uso, mas não deverá presumir que observar um comportamento significa ter permissão para repeti-lo automaticamente.
+
+O usuário deverá poder consultar, corrigir, pausar e revogar automações, agentes, integrações e permissões.
+
+### 8. Ferramentas, computadores e dispositivos conectados
+
+Com as integrações correspondentes instaladas e autorizadas, o Jarvis deverá conseguir interagir com recursos digitais e dispositivos físicos compatíveis.
+
+Isso poderá incluir gerenciamento de arquivos, execução de ferramentas, desenvolvimento de software, consulta a serviços, monitoramento de sistemas e automação residencial por meio do Home Assistant.
+
+Cada integração deverá declarar suas capacidades, pré-requisitos, permissões, limites e possíveis efeitos colaterais.
+
+O Jarvis deverá verificar o estado real de um recurso antes de realizar uma ação que dependa desse estado e, depois, confirmar o resultado quando houver um mecanismo confiável para isso.
+
+Por exemplo, ao receber uma solicitação para ligar uma luz, deverá utilizar a integração autorizada e verificar o estado informado pelo sistema. Não deverá afirmar que a luz foi ligada apenas porque enviou um comando.
+
+O modelo de linguagem não deverá executar comandos de sistema arbitrários sem validação. A execução deverá passar por ferramentas controladas, políticas de autorização, validação de parâmetros e registros apropriados.
+
+### 9. Estado do mundo e tratamento da incerteza
+
+O Jarvis deverá manter uma representação contextual das informações relevantes para suas decisões, combinando dados de ferramentas, serviços, dispositivos, memória e entradas do usuário.
+
+Essa representação deverá distinguir estados:
+
+- Observados diretamente.
+- Inferidos a partir de evidências.
+- Planejados, mas ainda não executados.
+- Previstos.
+- Desconhecidos.
+- Desatualizados.
+
+Quando uma informação for dinâmica, o Jarvis deverá consultar a fonte apropriada antes de depender dela, sempre que isso for necessário e permitido.
+
+Quando houver contradição ou evidência insuficiente, deverá comunicar a incerteza de forma proporcional à importância da decisão.
+
+O grau de confiança de um modelo nunca deverá substituir uma verificação real, uma regra de segurança ou uma autorização do usuário.
+
+### 10. Autocorreção e evolução controlada
+
+O Jarvis deverá conseguir monitorar sua própria operação, identificar falhas e tentar recuperar componentes quando isso for seguro.
+
+Poderá executar diagnósticos, reiniciar serviços permitidos, repetir operações recuperáveis, restaurar estados conhecidos e propor correções de código.
+
+Mudanças no próprio sistema deverão seguir um processo controlado:
+
+1. Identificar o problema e reunir evidências.
+2. Preparar a alteração em um ambiente apropriado.
+3. Executar testes e validações.
+4. Avaliar os resultados e possíveis efeitos colaterais.
+5. Disponibilizar a mudança conforme as políticas de aprovação.
+6. Monitorar o resultado e reverter a alteração quando necessário.
+
+Sempre que possível, as alterações deverão ter histórico, backup e um caminho de reversão testado.
+
+O Jarvis não poderá modificar as próprias políticas de segurança para liberar uma ação bloqueada, conceder permissões a si mesmo, apagar evidências de auditoria ou desativar mecanismos de proteção para fazer uma correção passar.
+
+A capacidade de melhorar o próprio funcionamento deverá aumentar a confiabilidade do sistema, e não tornar suas decisões imprevisíveis.
+
+### 11. Segurança, privacidade e recuperação
+
+A segurança deverá ser uma propriedade permanente da arquitetura, e não um recurso opcional.
+
+O Jarvis deverá aplicar autenticação, autorização, mínimo privilégio, proteção de credenciais, isolamento de sessões, validação de entradas, limites operacionais e registros auditáveis.
+
+Informações sensíveis deverão ser processadas localmente quando apropriado e tecnicamente possível. Qualquer envio a provedores externos deverá respeitar as configurações e permissões aplicáveis.
+
+O sistema deverá possuir mecanismos de backup, verificação de integridade e restauração testada. Uma falha de disco, corrupção de dados, atualização problemática ou indisponibilidade de um componente não deverá provocar perda evitável de todo o sistema.
+
+Credenciais, dados pessoais e conteúdo sensível não deverão ser expostos indevidamente em logs, notificações, prompts ou interfaces de diagnóstico.
+
+A recuperação de desastres deverá fazer parte do funcionamento operacional documentado, com procedimentos comprovados em ambiente de teste.
+
+### 12. Instalação, manutenção e experiência de uso
+
+O Jarvis deverá ser instalável, configurável, atualizável e recuperável por processos claros e reproduzíveis.
+
+Deverá oferecer perfis de instalação adequados aos ambientes suportados, como SERVER, CORE/AI NODE e All-in-One, sem duplicar desnecessariamente a lógica do produto.
+
+O instalador deverá verificar os pré-requisitos, orientar a configuração inicial, identificar problemas e validar a saúde do sistema. A instalação não deverá abrir portas públicas nem habilitar permissões perigosas por padrão.
+
+As atualizações deverão considerar a compatibilidade de configurações, migrações de dados, integridade da memória e possibilidade de reversão.
+
+O sistema também deverá oferecer logs compreensíveis, diagnósticos úteis, estado dos componentes, informações sobre tarefas e documentação suficiente para operação sem depender exclusivamente de uma IA para resolver qualquer problema.
+
+### 13. Critérios para considerar o Jarvis completo
+
+A conclusão do roadmap não deverá ser determinada apenas pela existência de arquivos, classes, interfaces ou funcionalidades demonstrativas.
+
+Cada capacidade importante deverá ter critérios de aceitação, documentação e testes correspondentes. Funcionalidades críticas deverão ser validadas em condições realistas, incluindo erros de rede, reinicializações, indisponibilidade de serviços, permissões negadas, recursos insuficientes e recuperação de falhas.
+
+Mocks poderão validar comportamentos isolados, mas não deverão ser considerados prova suficiente de integração real entre dispositivos, serviços ou sistemas operacionais.
+
+Antes de declarar o projeto concluído, deverá ser possível demonstrar que:
+
+- Os componentes se comunicam e mantêm o estado de maneira consistente.
+- Conversas, memórias e tarefas persistem conforme o comportamento documentado.
+- A execução de ferramentas respeita permissões e verifica resultados.
+- A autonomia não ultrapassa os limites definidos.
+- Os nós distribuídos são detectados e utilizados de maneira controlada.
+- Os mecanismos de backup e restauração funcionam em testes reais.
+- As falhas são identificadas e tratadas sem falsas declarações de sucesso.
+- A instalação, a configuração e a atualização funcionam nos ambientes oficialmente suportados.
+- A documentação corresponde à implementação e aos testes realmente executados.
+- O sistema pode ser utilizado, monitorado, atualizado e recuperado de forma sustentável.
+
+Uma funcionalidade deverá ser marcada como concluída somente quando houver evidência suficiente para sustentar essa afirmação. Capacidades ainda não implementadas, não testadas ou dependentes de serviços externos deverão ser identificadas explicitamente.
+
+### Resultado final esperado
+
+Ao final de todas as fases, o Jarvis deverá ser um assistente pessoal que permanece disponível, mantém contexto ao longo do tempo, entende objetivos, planeja tarefas, utiliza ferramentas e recursos distribuídos, automatiza atividades autorizadas, conecta-se a dispositivos compatíveis e melhora sua confiabilidade por meio de diagnósticos e correções controladas.
+
+Deverá combinar autonomia com supervisão, memória com privacidade, inteligência com evidências e flexibilidade com regras de segurança.
+
+O sistema deverá conseguir realizar trabalho útil de ponta a ponta: compreender uma solicitação, preparar e executar um plano permitido, verificar o resultado, preservar o contexto necessário e explicar o que foi feito.
+
+A visão final não é criar uma IA com acesso ilimitado a tudo, mas construir um assistente confiável, extensível e verdadeiramente útil, capaz de utilizar os recursos aos quais recebeu acesso sem perder o controle do estado, das permissões ou das consequências de suas ações.
+
+**Princípio definitivo:** o Jarvis deverá ser capaz de pensar sobre o que precisa fazer, planejar como fazer, executar o que está autorizado a fazer, verificar se realmente funcionou, aprender com o resultado e se recuperar de falhas — sem inventar resultados, ocultar incertezas ou ultrapassar as permissões do usuário.
