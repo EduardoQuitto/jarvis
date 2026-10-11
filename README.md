@@ -9,6 +9,12 @@ J.A.R.V.I.S. is a local, modular, distributed personal AI assistant built with s
 
 It is **not** a cloud chatbot. It is a local intelligence layer that runs on your own hardware, talks to your own devices, and follows your own security rules.
 
+## O que o Jarvis consegue fazer?
+
+Conheça as capacidades, os exemplos de uso, as integrações residenciais, as possibilidades de servidores e a visão de longo prazo do J.A.R.V.I.S.
+
+[Leia a apresentação completa do Jarvis →](docs/JARVIS_CAPABILITIES.md)
+
 ---
 
 ## Current Status
