@@ -4,15 +4,16 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from core.config import endpoint_host_port
 from core.device.registry import DeviceRegistry
 from core.contracts.device import (
     DeviceRegistrationRequest,
     DeviceHeartbeat,
     DeviceType,
-    DeviceCapability,
+    NodeStatus,
 )
 from core.logger import get_logger
-from security.auth import optional_node_auth
+from security.auth import DeviceIdentity, require_device_identity, require_node_auth
 
 logger = get_logger("jarvis.api.devices")
 
@@ -50,26 +51,27 @@ class HeartbeatRequest(BaseModel):
 @router.post("/", response_model=Dict[str, Any])
 async def register_device(
     request: DeviceRegisterRequest,
-    _token: str = Depends(optional_node_auth),
+    identity: DeviceIdentity = Depends(require_device_identity),
 ) -> Dict[str, Any]:
-    """Register a new device."""
+    """Register the authenticated device using its SERVER-side descriptor."""
+    if request.device_id != identity.device_id:
+        raise HTTPException(
+            status_code=403,
+            detail="device_id does not match authenticated device",
+        )
+
     try:
         registry = _get_registry()
-        caps = []
-        for c in request.capabilities:
-            try:
-                caps.append(DeviceCapability(c))
-            except ValueError:
-                caps.append(DeviceCapability("sensor"))
-
+        descriptor = identity.descriptor
+        host, port = endpoint_host_port(descriptor.endpoint)
         req = DeviceRegistrationRequest(
-            device_id=request.device_id,
+            device_id=identity.device_id,
             name=request.name,
-            device_type=DeviceType(request.device_type) if request.device_type else DeviceType.UNKNOWN,
-            capabilities=caps,
+            device_type=descriptor.device_type,
+            capabilities=list(descriptor.capabilities),
             version=request.version,
-            ip_address=request.ip_address,
-            port=request.port,
+            ip_address=host,
+            port=port,
         )
         device = await registry.register_device(req)
         return {
@@ -79,27 +81,30 @@ async def register_device(
         }
     except Exception as e:
         logger.error("Register device error: %s", str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error during device registration.")
 
 
 @router.post("/heartbeat")
 async def send_heartbeat(
     request: HeartbeatRequest,
-    _token: str = Depends(optional_node_auth),
+    identity: DeviceIdentity = Depends(require_device_identity),
 ) -> Dict[str, Any]:
-    """Send a device heartbeat."""
+    """Send a heartbeat for the authenticated device only."""
+    if request.device_id != identity.device_id:
+        raise HTTPException(
+            status_code=403,
+            detail="device_id does not match authenticated device",
+        )
+
     try:
         registry = _get_registry()
-        status = None
         try:
-            from core.contracts.device import NodeStatus
             status = NodeStatus(request.status)
         except ValueError:
-            from core.contracts.device import NodeStatus
             status = NodeStatus.ONLINE
 
         heartbeat = DeviceHeartbeat(
-            device_id=request.device_id,
+            device_id=identity.device_id,
             status=status,
             capabilities=[],
         )
@@ -113,7 +118,7 @@ async def send_heartbeat(
 @router.get("/", response_model=List[Dict[str, Any]])
 async def list_devices(
     device_type: Optional[str] = None,
-    _token: str = Depends(optional_node_auth),
+    _token: str = Depends(require_node_auth),
 ) -> List[Dict[str, Any]]:
     """List all devices."""
     try:
@@ -141,7 +146,7 @@ async def list_devices(
 
 @router.get("/online", response_model=List[Dict[str, Any]])
 async def list_online_devices(
-    _token: str = Depends(optional_node_auth),
+    _token: str = Depends(require_node_auth),
 ) -> List[Dict[str, Any]]:
     """List all online devices."""
     try:
@@ -166,7 +171,7 @@ async def list_online_devices(
 
 @router.get("/summary")
 async def device_summary(
-    _token: str = Depends(optional_node_auth),
+    _token: str = Depends(require_node_auth),
 ) -> Dict[str, Any]:
     """Get device capability summary."""
     try:
@@ -181,7 +186,7 @@ async def device_summary(
 @router.delete("/{device_id}")
 async def remove_device(
     device_id: str,
-    _token: str = Depends(optional_node_auth),
+    _token: str = Depends(require_node_auth),
 ) -> Dict[str, Any]:
     """Remove a device from the registry."""
     try:
