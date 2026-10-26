@@ -43,6 +43,7 @@ class RemoteNodeClient:
         api_key: Bearer token used for SERVER authentication.
         timeout: Per-request timeout in seconds.
         transport: Optional httpx transport (used by tests with MockTransport).
+        device_token: Individual token for device registration/heartbeat.
     """
 
     def __init__(
@@ -51,27 +52,40 @@ class RemoteNodeClient:
         api_key: str = "",
         timeout: float = 30.0,
         transport: Optional[httpx.AsyncBaseTransport] = None,
+        device_token: str = "",
     ):
         self.base_url = (base_url or "").rstrip("/")
         self.api_key = api_key or ""
         self.timeout = timeout
         self._transport = transport
+        self.device_token = (device_token or "").strip()
 
     @property
     def is_configured(self) -> bool:
         """Whether a remote SERVER URL was configured."""
         return bool(self.base_url)
 
-    def _build_headers(self) -> Dict[str, str]:
+    def _build_headers(self, extra_headers: Optional[Dict[str, str]] = None) -> Dict[str, str]:
         headers: Dict[str, str] = {"Content-Type": "application/json"}
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
+        if extra_headers:
+            headers.update(extra_headers)
         return headers
 
-    def _build_client(self) -> httpx.AsyncClient:
+    def _device_auth_headers(self) -> Dict[str, str]:
+        """Device token header, failing locally when not provisioned."""
+        if not self.device_token:
+            raise RemoteNodeError(
+                "Device token is not configured (JARVIS_DEVICE_TOKEN is empty).",
+                kind="configuration",
+            )
+        return {"X-Device-Token": self.device_token}
+
+    def _build_client(self, headers: Optional[Dict[str, str]] = None) -> httpx.AsyncClient:
         return httpx.AsyncClient(
             timeout=self.timeout,
-            headers=self._build_headers(),
+            headers=self._build_headers(headers),
             transport=self._transport,
         )
 
@@ -81,6 +95,7 @@ class RemoteNodeClient:
         path: str,
         payload: Optional[Dict[str, Any]] = None,
         params: Optional[Dict[str, Any]] = None,
+        headers: Optional[Dict[str, str]] = None,
     ) -> Any:
         """Synchronous twin of _request for sync contexts (e.g. ConfirmationManager).
 
@@ -96,7 +111,7 @@ class RemoteNodeClient:
         try:
             with httpx.Client(
                 timeout=self.timeout,
-                headers=self._build_headers(),
+                headers=self._build_headers(headers),
                 transport=self._transport,
             ) as client:
                 response = client.request(method, url, json=payload, params=params)
@@ -166,6 +181,7 @@ class RemoteNodeClient:
         path: str,
         payload: Optional[Dict[str, Any]] = None,
         params: Optional[Dict[str, Any]] = None,
+        headers: Optional[Dict[str, str]] = None,
     ) -> Any:
         """Perform one HTTP request and return the parsed JSON body."""
         if not self.base_url:
@@ -175,7 +191,7 @@ class RemoteNodeClient:
             )
         url = f"{self.base_url}{path}"
         try:
-            async with self._build_client() as client:
+            async with self._build_client(headers) as client:
                 response = await client.request(method, url, json=payload, params=params)
         except httpx.TimeoutException as e:
             logger.error("Remote SERVER timeout (%s %s): %s", method, path, str(e))
@@ -300,7 +316,10 @@ class RemoteNodeClient:
             payload["ip_address"] = ip_address
         if port and port > 0:
             payload["port"] = port
-        data = await self._request("POST", "/api/devices/", payload=payload)
+        data = await self._request(
+            "POST", "/api/devices/", payload=payload,
+            headers=self._device_auth_headers(),
+        )
         if not isinstance(data, dict):
             raise RemoteNodeError(
                 "Remote SERVER /api/devices/ returned an unexpected payload.",
@@ -326,7 +345,10 @@ class RemoteNodeClient:
             "status": status,
             "capabilities": capabilities or [],
         }
-        data = await self._request("POST", "/api/devices/heartbeat", payload=payload)
+        data = await self._request(
+            "POST", "/api/devices/heartbeat", payload=payload,
+            headers=self._device_auth_headers(),
+        )
         if not isinstance(data, dict):
             raise RemoteNodeError(
                 "Remote SERVER /api/devices/heartbeat returned an unexpected payload.",

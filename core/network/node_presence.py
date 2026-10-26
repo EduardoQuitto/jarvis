@@ -80,11 +80,21 @@ class NodePresenceManager:
             return None
         ip = settings.node_advertise_ip or None
         raw_port = settings.node_advertise_port or 0
+        device_token = (
+            settings.device_token.get_secret_value().strip()
+            if settings.device_token else ""
+        )
+        if not device_token:
+            logger.warning(
+                "Presence: JARVIS_DEVICE_TOKEN is not configured; "
+                "device registration will fail closed."
+            )
         return cls(
             client=client or RemoteNodeClient(
                 base_url=settings.server_url,
                 api_key=settings.server_api_key,
                 timeout=settings.server_timeout,
+                device_token=device_token,
             ),
             device_id=settings.node_id,
             name=CORE_DISPLAY_NAME,
