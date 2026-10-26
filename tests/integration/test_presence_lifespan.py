@@ -41,8 +41,11 @@ def simulated_transport(monkeypatch):
     log = _CallLog()
     transport = httpx.MockTransport(log.handler)
 
-    def _factory(base_url="", api_key="", timeout=30.0, **kwargs):
-        return RemoteNodeClient(base_url=base_url, api_key=api_key, timeout=timeout, transport=transport)
+    def _factory(base_url="", api_key="", timeout=30.0, device_token="", **kwargs):
+        return RemoteNodeClient(
+            base_url=base_url, api_key=api_key, timeout=timeout,
+            transport=transport, device_token=device_token,
+        )
 
     monkeypatch.setattr("core.network.node_presence.RemoteNodeClient", _factory)
     return log
@@ -52,6 +55,7 @@ def simulated_transport(monkeypatch):
 async def test_lifespan_registers_and_heartbeats_then_stops_cleanly(monkeypatch, simulated_transport):
     monkeypatch.setenv("JARVIS_SERVER_URL", "http://simulated-server:8000")
     monkeypatch.setenv("JARVIS_SERVER_API_KEY", "test-key")
+    monkeypatch.setenv("JARVIS_DEVICE_TOKEN", "test-device-token-0123456789")
     monkeypatch.setenv("JARVIS_SERVER_HEARTBEAT_INTERVAL", "0.05")
     reset_settings()
 
@@ -63,6 +67,7 @@ async def test_lifespan_registers_and_heartbeats_then_stops_cleanly(monkeypatch,
         await asyncio.sleep(0.25)
         assert len(simulated_transport.registers) >= 1
         assert len(simulated_transport.heartbeats) >= 1
+        assert simulated_transport.registers[0].headers["x-device-token"] == "test-device-token-0123456789"
         task = presence._task
 
     assert presence.is_running is False
@@ -87,11 +92,16 @@ async def test_lifespan_shutdown_clean_with_server_offline(monkeypatch):
 
     transport = httpx.MockTransport(_offline_handler)
 
-    def _factory(base_url="", api_key="", timeout=30.0, **kwargs):
-        return RemoteNodeClient(base_url=base_url, api_key=api_key, timeout=timeout, transport=transport)
+    def _factory(base_url="", api_key="", timeout=30.0, device_token="", **kwargs):
+        return RemoteNodeClient(
+            base_url=base_url, api_key=api_key, timeout=timeout,
+            transport=transport, device_token=device_token,
+        )
 
     monkeypatch.setattr("core.network.node_presence.RemoteNodeClient", _factory)
     monkeypatch.setenv("JARVIS_SERVER_URL", "http://simulated-server:8000")
+    monkeypatch.setenv("JARVIS_SERVER_API_KEY", "test-key")
+    monkeypatch.setenv("JARVIS_DEVICE_TOKEN", "test-device-token-0123456789")
     monkeypatch.setenv("JARVIS_SERVER_HEARTBEAT_INTERVAL", "0.05")
     reset_settings()
 

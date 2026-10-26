@@ -16,9 +16,13 @@ from core.network.node_client import RemoteNodeClient, RemoteNodeError
 from core.network.node_presence import NodePresenceManager, project_version
 
 
-def _make_client(handler, base_url="http://testserver", api_key="test-key", timeout=5.0):
+def _make_client(handler, base_url="http://testserver", api_key="test-key", timeout=5.0,
+                 device_token="test-device-token-0123456789"):
     transport = httpx.MockTransport(handler)
-    return RemoteNodeClient(base_url=base_url, api_key=api_key, timeout=timeout, transport=transport)
+    return RemoteNodeClient(
+        base_url=base_url, api_key=api_key, timeout=timeout,
+        transport=transport, device_token=device_token,
+    )
 
 
 class _StubClient:
@@ -72,6 +76,8 @@ def test_presence_config_defaults(monkeypatch):
     assert settings.server_heartbeat_interval == 30.0
     assert settings.node_advertise_ip == ""
     assert settings.node_advertise_port == 0
+    assert settings.device_token is None
+    assert settings.trusted_devices == {}
 
 
 def test_presence_disabled_when_server_url_empty(monkeypatch):
@@ -83,6 +89,7 @@ def test_presence_disabled_when_server_url_empty(monkeypatch):
 def test_presence_identity_and_version(monkeypatch):
     monkeypatch.setenv("JARVIS_SERVER_URL", "http://testserver")
     monkeypatch.setenv("JARVIS_NODE_ID", "jarvis-core")
+    monkeypatch.setenv("JARVIS_DEVICE_TOKEN", "test-device-token-0123456789")
     reset_settings()
     manager = NodePresenceManager.from_settings(client=_StubClient())
     assert manager is not None
@@ -134,6 +141,7 @@ async def test_register_device_posts_expected_payload():
         assert request.url.path == "/api/devices/"
         assert request.method == "POST"
         seen["auth"] = request.headers.get("authorization")
+        seen["device_token"] = request.headers.get("x-device-token")
         seen["body"] = json.loads(request.content.decode())
         return httpx.Response(200, json={"device_id": "jarvis-core", "status": "ONLINE", "registered": True})
 
@@ -147,12 +155,50 @@ async def test_register_device_posts_expected_payload():
     )
     assert result["registered"] is True
     assert seen["auth"] == "Bearer test-key"
+    assert seen["device_token"] == "test-device-token-0123456789"
     body = seen["body"]
     assert body["device_id"] == "jarvis-core"
     assert body["device_type"] == "CORE"
     assert body["capabilities"] == ["llm"]
     assert "ip_address" not in body  # not invented
     assert "port" not in body
+
+
+@pytest.mark.asyncio
+async def test_device_operations_fail_locally_without_device_token():
+    calls = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request)
+        return httpx.Response(200, json={"registered": True})
+
+    client = _make_client(handler, device_token="")
+    with pytest.raises(RemoteNodeError) as exc_info:
+        await client.register_device(device_id="jarvis-core")
+    assert exc_info.value.kind == "configuration"
+    with pytest.raises(RemoteNodeError) as exc_info:
+        await client.heartbeat(device_id="jarvis-core")
+    assert exc_info.value.kind == "configuration"
+    assert calls == []
+
+
+def test_presence_propagates_device_token_to_client(monkeypatch):
+    captured = {}
+
+    class _CapturingClient(_StubClient):
+        def __init__(self, **kwargs):
+            super().__init__()
+            captured.update(kwargs)
+
+    monkeypatch.setenv("JARVIS_SERVER_URL", "http://testserver")
+    monkeypatch.setenv("JARVIS_SERVER_API_KEY", "test-key")
+    monkeypatch.setenv("JARVIS_DEVICE_TOKEN", "test-device-token-0123456789")
+    monkeypatch.setattr("core.network.node_presence.RemoteNodeClient", _CapturingClient)
+    reset_settings()
+
+    manager = NodePresenceManager.from_settings()
+    assert manager is not None
+    assert captured["device_token"] == "test-device-token-0123456789"
 
 
 @pytest.mark.asyncio
@@ -176,12 +222,14 @@ async def test_heartbeat_posts_expected_payload():
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.url.path == "/api/devices/heartbeat"
         assert request.method == "POST"
+        seen["device_token"] = request.headers.get("x-device-token")
         seen["body"] = json.loads(request.content.decode())
         return httpx.Response(200, json={"status": "ok"})
 
     client = _make_client(handler)
     result = await client.heartbeat(device_id="jarvis-core", status="ONLINE", capabilities=["llm"])
     assert result == {"status": "ok"}
+    assert seen["device_token"] == "test-device-token-0123456789"
     assert seen["body"] == {"device_id": "jarvis-core", "status": "ONLINE", "capabilities": ["llm"]}
 
 
