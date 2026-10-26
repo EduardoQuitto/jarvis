@@ -80,6 +80,15 @@ class _FakeCoreHttp:
 def _seed_core(monkeypatch, tmp_path):
     import server.compute as compute_mod
 
+    monkeypatch.setenv("JARVIS_TRUSTED_DEVICES", json.dumps({
+        "jarvis-core": {
+            "token": "test-device-token-0123456789",
+            "device_type": "CORE",
+            "capabilities": ["llm"],
+            "endpoint": "http://10.0.0.8:8000",
+        }
+    }))
+    reset_settings()
     mem = SQLiteMemoryProvider(db_path=str(tmp_path / "gw-int.db"))
     registry = DeviceRegistry(memory=mem)
     monkeypatch.setattr(compute_mod, "_registry", registry)

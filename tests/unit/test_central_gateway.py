@@ -22,6 +22,24 @@ from core.device.registry import DeviceRegistry
 from memory.sqlite_provider import SQLiteMemoryProvider
 
 
+def _set_trusted_devices(monkeypatch, devices):
+    monkeypatch.setenv("JARVIS_TRUSTED_DEVICES", json.dumps(devices))
+    reset_settings()
+
+
+def _trusted_core(monkeypatch, device_id="jarvis-core",
+                  endpoint="http://192.168.0.8:8000",
+                  token="test-device-token-0123456789"):
+    _set_trusted_devices(monkeypatch, {
+        device_id: {
+            "token": token,
+            "device_type": "CORE",
+            "capabilities": ["llm"],
+            "endpoint": endpoint,
+        }
+    })
+
+
 def _eligible_kwargs(**overrides):
     params = {
         "device_id": "jarvis-core",
@@ -58,13 +76,27 @@ async def test_select_compute_node_prefers_eligible_core(tmp_path, monkeypatch):
     await registry.register_device(DeviceRegistrationRequest(**_eligible_kwargs(
         device_id="noaddr", ip_address="", port=0,
     )))
+    _set_trusted_devices(monkeypatch, {
+        "jarvis-core": {
+            "token": "test-device-token-0123456789",
+            "device_type": "CORE",
+            "capabilities": ["llm"],
+            "endpoint": "http://192.168.0.8:8000",
+        },
+        "old-node": {
+            "token": "test-device-token-old-node-0123456789",
+            "device_type": "CORE",
+            "capabilities": ["llm"],
+            "endpoint": "http://192.168.0.9:8000",
+        },
+    })
     monkeypatch.setattr(compute_mod, "_registry", registry)
 
     node = await compute_mod.select_compute_node()
     assert node is not None
     assert node.device_id in ("jarvis-core", "old-node")
     assert node.device_type == DeviceType.CORE
-    assert node.ip_address and node.port
+    assert node.ip_address in ("192.168.0.8", "192.168.0.9")
 
 
 @pytest.mark.asyncio
@@ -83,9 +115,11 @@ async def test_select_compute_node_none_when_unavailable(tmp_path, monkeypatch):
     assert await compute_mod.select_compute_node() is None
 
 
-def test_is_compute_eligible_matrix():
+def test_is_compute_eligible_matrix(monkeypatch):
     import server.compute as compute_mod
     from datetime import datetime, timezone
+
+    _trusted_core(monkeypatch, device_id="d")
 
     def device(**overrides):
         params = {
@@ -102,8 +136,9 @@ def test_is_compute_eligible_matrix():
     assert compute_mod.is_compute_eligible(device(status=NodeStatus.OFFLINE)) is False
     assert compute_mod.is_compute_eligible(device(device_type=DeviceType.MOBILE)) is False
     assert compute_mod.is_compute_eligible(device(capabilities=[])) is False
-    assert compute_mod.is_compute_eligible(device(ip_address="")) is False
-    assert compute_mod.is_compute_eligible(device(port=0)) is False
+    assert compute_mod.is_compute_eligible(device(ip_address="")) is True
+    assert compute_mod.is_compute_eligible(device(port=0)) is True
+    assert compute_mod.is_compute_eligible(device(device_id="untrusted")) is False
     assert compute_mod.compute_base_url(device()) == "http://192.168.0.8:8000"
 
 
@@ -152,7 +187,7 @@ class _FakeHttpxClient:
         return self.stream_response
 
     async def post(self, url, headers=None, json=None):
-        self.posted.append((url, json))
+        self.posted.append((url, json, headers))
         return self.post_response
 
 
@@ -162,6 +197,7 @@ async def test_forward_chat_send_success_and_contract(tmp_path, monkeypatch):
 
     mem, registry = _seeded_registry(tmp_path, None)
     await registry.register_device(DeviceRegistrationRequest(**_eligible_kwargs()))
+    _trusted_core(monkeypatch)
     monkeypatch.setattr(compute_mod, "_registry", registry)
 
     payload = {"session_id": "s", "response_text": "hi", "tool_calls": [],
@@ -174,6 +210,91 @@ async def test_forward_chat_send_success_and_contract(tmp_path, monkeypatch):
     result = await compute_mod.forward_chat_send({"message": "hi"})
     assert result["response_text"] == "hi"
     assert _FakeHttpxClient.posted[0][0] == "http://192.168.0.8:8000/internal/chat/send"
+
+
+@pytest.mark.asyncio
+async def test_forward_chat_send_uses_trusted_endpoint_not_sqlite(tmp_path, monkeypatch):
+    import server.compute as compute_mod
+
+    mem, registry = _seeded_registry(tmp_path, None)
+    await registry.register_device(DeviceRegistrationRequest(**_eligible_kwargs(
+        ip_address="10.9.9.9", port=9999,
+    )))
+    _trusted_core(monkeypatch, endpoint="http://192.168.0.8:8000")
+    monkeypatch.setattr(compute_mod, "_registry", registry)
+
+    _FakeHttpxClient.post_response = _FakeSyncResponse(200, {"response_text": "ok"})
+    _FakeHttpxClient.posted = []
+    monkeypatch.setattr(compute_mod.httpx, "AsyncClient", _FakeHttpxClient)
+
+    await compute_mod.forward_chat_send({"message": "hi"})
+    url, _, headers = _FakeHttpxClient.posted[0]
+    assert url == "http://192.168.0.8:8000/internal/chat/send"
+    assert "10.9.9.9" not in url
+    assert headers["Authorization"].startswith("Bearer ")
+
+
+@pytest.mark.asyncio
+async def test_unprovisioned_core_is_never_selected(tmp_path, monkeypatch):
+    import server.compute as compute_mod
+
+    mem, registry = _seeded_registry(tmp_path, None)
+    await registry.register_device(DeviceRegistrationRequest(**_eligible_kwargs(
+        ip_address="10.9.9.9", port=9999,
+    )))
+    _set_trusted_devices(monkeypatch, {})
+    monkeypatch.setattr(compute_mod, "_registry", registry)
+
+    assert await compute_mod.select_compute_node() is None
+
+
+@pytest.mark.asyncio
+async def test_untrusted_node_never_receives_credentials(tmp_path, monkeypatch):
+    import server.compute as compute_mod
+    from server.compute import ComputeUnavailable
+
+    _set_trusted_devices(monkeypatch, {})
+    _FakeHttpxClient.posted = []
+    monkeypatch.setattr(compute_mod.httpx, "AsyncClient", _FakeHttpxClient)
+
+    with pytest.raises(ComputeUnavailable):
+        await compute_mod.forward_chat_send(
+            {"message": "hi"},
+            node=Device(**_eligible_kwargs()).model_copy(
+                update={"ip_address": "10.9.9.9", "port": 9999},
+            ),
+        )
+    assert _FakeHttpxClient.posted == []
+
+
+@pytest.mark.asyncio
+async def test_gateway_returns_503_for_unprovisioned_core_without_fallback(
+    tmp_path, monkeypatch,
+):
+    from httpx import AsyncClient, ASGITransport
+    from server.app import create_app
+    import server.compute as compute_mod
+    import server.routers.chat as chat_module
+
+    _server_role(monkeypatch)
+    _set_trusted_devices(monkeypatch, {})
+    mem, registry = _seeded_registry(tmp_path, None)
+    await registry.register_device(DeviceRegistrationRequest(**_eligible_kwargs(
+        ip_address="10.9.9.9", port=9999,
+    )))
+    monkeypatch.setattr(compute_mod, "_registry", registry)
+    _FakeHttpxClient.posted = []
+    monkeypatch.setattr(compute_mod.httpx, "AsyncClient", _FakeHttpxClient)
+
+    app = create_app()
+    headers = {"Authorization": f"Bearer {get_settings().api_key}"}
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.post(
+            "/api/chat/send", json={"message": "hi"}, headers=headers,
+        )
+    assert response.status_code == 503
+    assert _FakeHttpxClient.posted == []
+    assert chat_module._orchestrator is None
 
 
 @pytest.mark.asyncio
@@ -194,9 +315,10 @@ async def test_forward_chat_stream_relays_bytes_untouched(tmp_path, monkeypatch)
 
     mem, registry = _seeded_registry(tmp_path, None)
     await registry.register_device(DeviceRegistrationRequest(**_eligible_kwargs()))
+    _trusted_core(monkeypatch)
     monkeypatch.setattr(compute_mod, "_registry", registry)
 
-    frames = [b"event: start\ndata: {\"a\": 1}\n\n", b"event: done\ndata: {}\n\n"]
+    frames = [b'event: start\ndata: {"a": 1}\n\n', b'event: done\ndata: {}\n\n']
     _FakeHttpxClient.stream_response = _FakeStreamResponse(frames)
     monkeypatch.setattr(compute_mod.httpx, "AsyncClient", _FakeHttpxClient)
 
@@ -211,9 +333,10 @@ async def test_forward_chat_stream_disconnect_closes_upstream(tmp_path, monkeypa
 
     mem, registry = _seeded_registry(tmp_path, None)
     await registry.register_device(DeviceRegistrationRequest(**_eligible_kwargs()))
+    _trusted_core(monkeypatch)
     monkeypatch.setattr(compute_mod, "_registry", registry)
 
-    stream = _FakeStreamResponse([b"event: start\ndata: {}\n\n", b"event: text_delta\ndata: {}\n\n"])
+    stream = _FakeStreamResponse([b'event: start\ndata: {}\n\n', b'event: text_delta\ndata: {}\n\n'])
     _FakeHttpxClient.stream_response = stream
     monkeypatch.setattr(compute_mod.httpx, "AsyncClient", _FakeHttpxClient)
 
@@ -279,6 +402,7 @@ async def test_gateway_stream_proxies_sse_frames(tmp_path, monkeypatch):
     import server.compute as compute_mod
 
     _server_role(monkeypatch)
+    _trusted_core(monkeypatch)
     # A compute node must exist: the handler pre-selects for an eager 503.
     mem = SQLiteMemoryProvider(db_path=str(tmp_path / "gw-seed.db"))
     seeded = DeviceRegistry(memory=mem)
@@ -400,12 +524,16 @@ async def test_internal_requires_auth():
 
 
 @pytest.mark.asyncio
-async def test_devices_list_exposes_compute_fields():
+async def test_devices_list_exposes_compute_fields(monkeypatch):
     from httpx import AsyncClient, ASGITransport
     from server.app import create_app
 
+    _trusted_core(monkeypatch)
     app = create_app()
-    headers = {"Authorization": f"Bearer {get_settings().api_key}"}
+    headers = {
+        "Authorization": f"Bearer {get_settings().api_key}",
+        "X-Device-Token": "test-device-token-0123456789",
+    }
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         await client.post("/api/devices/", json={
@@ -413,7 +541,10 @@ async def test_devices_list_exposes_compute_fields():
             "capabilities": ["llm"], "version": "0.5.0",
             "ip_address": "192.168.0.8", "port": 8000,
         }, headers=headers)
-        devices = (await client.get("/api/devices/", headers=headers)).json()
+        devices = (await client.get(
+            "/api/devices/",
+            headers={"Authorization": f"Bearer {get_settings().api_key}"},
+        )).json()
     core = next(d for d in devices if d["device_id"] == "jarvis-core")
     assert core["ip_address"] == "192.168.0.8"
     assert core["port"] == 8000
