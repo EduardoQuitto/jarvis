@@ -13,7 +13,7 @@ from typing import Any, AsyncGenerator, Dict, List, Optional
 
 import httpx
 
-from core.config import get_settings
+from core.config import TrustedDeviceConfig, get_settings, validate_device_endpoint
 from core.contracts.device import Device, DeviceCapability, DeviceType, NodeStatus
 from core.device.registry import DeviceRegistry
 from core.logger import get_logger
@@ -53,26 +53,44 @@ def _capability_values(device: Device) -> List[str]:
     return values
 
 
+def _trusted_descriptor(device_id: str) -> Optional[TrustedDeviceConfig]:
+    """Return the SERVER-side descriptor for a provisioned device."""
+    return get_settings().trusted_devices.get(device_id)
+
+
+def _trusted_compute_endpoint(device_id: str) -> Optional[str]:
+    """Return the trusted endpoint only for a provisioned LLM CORE."""
+    descriptor = _trusted_descriptor(device_id)
+    if descriptor is None:
+        return None
+    if descriptor.device_type != DeviceType.CORE:
+        return None
+    if DeviceCapability.LLM not in descriptor.capabilities:
+        return None
+    try:
+        return validate_device_endpoint(descriptor.endpoint)
+    except ValueError:
+        logger.error("Invalid trusted endpoint for device: %s", device_id)
+        return None
+
+
 def is_compute_eligible(device: Device) -> bool:
-    """A CORE is eligible when ONLINE/READY, LLM-capable and addressable."""
+    """A CORE is eligible only when online and provisioned as an LLM CORE.
+
+    SQLite proves liveness only. Device type, capabilities and the compute
+    endpoint come from the SERVER-side trusted descriptor.
+    """
     if device.device_type != DeviceType.CORE:
         return False
     if device.status not in (NodeStatus.ONLINE, NodeStatus.READY):
         return False
     if DeviceCapability.LLM.value not in _capability_values(device):
         return False
-    if not device.ip_address:
-        return False
-    try:
-        if not device.port or int(device.port) <= 0:
-            return False
-    except (TypeError, ValueError):
-        return False
-    return True
+    return _trusted_compute_endpoint(device.device_id) is not None
 
 
 async def select_compute_node() -> Optional[Device]:
-    """Return one eligible compute CORE, or None when unavailable."""
+    """Return one eligible provisioned compute CORE, or None."""
     registry = _get_registry()
     try:
         online = await registry.get_online_devices()
@@ -83,13 +101,19 @@ async def select_compute_node() -> Optional[Device]:
     if not eligible:
         return None
     node = eligible[0]
-    logger.info("Selected compute node: %s (%s:%s)", node.device_id, node.ip_address, node.port)
+    endpoint = _trusted_compute_endpoint(node.device_id)
+    logger.info("Selected compute node: %s (%s)", node.device_id, endpoint)
     return node
 
 
 def compute_base_url(device: Device) -> str:
-    """HTTP base URL of a compute node (no secrets involved)."""
-    return f"http://{device.ip_address}:{int(device.port)}"
+    """Trusted HTTP origin for a provisioned compute node (no secrets)."""
+    endpoint = _trusted_compute_endpoint(device.device_id)
+    if endpoint is None:
+        raise ComputeUnavailable(
+            "No trusted compute endpoint is configured for this device."
+        )
+    return endpoint
 
 
 def _forward_headers() -> Dict[str, str]:
