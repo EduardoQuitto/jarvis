@@ -35,7 +35,16 @@ JARVIS is designed as a distributed system running across multiple nodes on a lo
 
 ## Security Considerations
 
-- All management and tool routes require authentication
+- Device management routes always require node Bearer authentication, including
+  in development.
+- Registration and heartbeat also require an individual `X-Device-Token`
+  provisioned in the SERVER's `JARVIS_TRUSTED_DEVICES` map. The CORE receives
+  only its own token via `JARVIS_DEVICE_TOKEN`.
+- Device type, capabilities, and the compute endpoint are authoritative on the
+  SERVER. Client-supplied identity fields and SQLite addresses are not used for
+  gateway routing.
+- The gateway forwards only to a trusted endpoint and returns HTTP 503 when no
+  provisioned CORE is available; it never falls back to local orchestration.
 - API key validation uses constant-time comparison (`hmac.compare_digest`)
 - Anti-SSRF protection blocks requests to private/loopback IPs by default
 - LAN access can be opted-in via `JARVIS_NET_ALLOW_PRIVATE_NETWORKS` (CIDR ranges)

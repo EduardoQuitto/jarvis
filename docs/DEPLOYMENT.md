@@ -99,6 +99,34 @@ JARVIS_GOOGLE_API_KEY=<same-shared-node-key>
 JARVIS_GOOGLE_MODEL=gemini-3.7-flash
 ```
 
+### Device identity rollout (Patch 1A)
+
+Configure in this order. There is no insecure fallback while configuration is
+incomplete.
+
+1. **SERVER first:** generate a unique token for the CORE and add its trusted
+   descriptor to the SERVER `.env`. The endpoint is the CORE origin the SERVER
+   will call; it is not read from SQLite.
+2. **Restart/reload the SERVER** so the trusted descriptor is loaded.
+3. **CORE second:** copy only that CORE's individual token to `JARVIS_DEVICE_TOKEN`.
+4. **Restart the CORE.** Registration and heartbeat require both the shared
+   node key and `X-Device-Token`.
+
+SERVER `.env` example (placeholder values only):
+```env
+JARVIS_TRUSTED_DEVICES={"jarvis-core":{"token":"<generated-token>","device_type":"CORE","capabilities":["llm"],"endpoint":"http://192.168.0.8:8000"}}
+```
+
+CORE `.env` addition:
+```env
+JARVIS_DEVICE_TOKEN=<same-generated-token>
+```
+
+The CORE's `JARVIS_NODE_ADVERTISE_IP` / `JARVIS_NODE_ADVERTISE_PORT` remain
+presence telemetry only; the gateway destination comes from the SERVER trusted
+descriptor. Until both sides are provisioned, device registration returns
+`401`/`403` and the gateway returns `503` instead of falling back locally.
+
 **Verify (from the CORE machine):**
 ```bash
 python scripts/check_remote_server.py   # health/tools/echo on SERVER

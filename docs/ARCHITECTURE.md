@@ -83,7 +83,7 @@ graph TD
 | Module | Responsibility | OS-Agnostic? |
 |--------|---------------|--------------|
 | `core/network` | CORE → SERVER bridge: RemoteNodeClient (HTTP transport only), NodePresenceManager (auto-registration + heartbeat), CentralStateClient (central conversations/memory/confirmations) | Yes (100%) |
-| `server/compute.py` | SERVER gateway: compute discovery via DeviceRegistry, chat forwarding to CORE (503 without CORE) | Yes (100%) |
+| `server/compute.py` | SERVER gateway: compute selection via DeviceRegistry presence + trusted descriptor, chat forwarding to CORE (503 without CORE) | Yes (100%) |
 | `core/contracts` | Interfaces, DTOs, enums | Yes (100%) |
 | `core/config` | Centralized settings (Pydantic) | Yes (100%) |
 | `core/events` | System-wide event bus | Yes (100%) |
@@ -131,14 +131,20 @@ All tool execution flows through a single authorization boundary:
 
 ### Distributed Presence (CORE → SERVER)
 - On startup (FastAPI lifespan), the Core auto-registers on the SERVER via
-  `POST /api/devices/` (`device_id` = `node_id`, `device_type` = `CORE`,
-  `capabilities` = `["llm"]`) and sends `POST /api/devices/heartbeat`
-  every `JARVIS_SERVER_HEARTBEAT_INTERVAL` seconds (default 30s).
+  `POST /api/devices/` (`device_id` = `node_id`) and sends
+  `POST /api/devices/heartbeat` every `JARVIS_SERVER_HEARTBEAT_INTERVAL`
+  seconds (default 30s). Both calls require the shared node key and the
+  CORE's individual `X-Device-Token`.
+- The SERVER trusts only descriptors configured in `JARVIS_TRUSTED_DEVICES`;
+  device type, capabilities and endpoint come from that descriptor, not from
+  client fields or SQLite. The CORE receives only its own token via
+  `JARVIS_DEVICE_TOKEN`.
 - Registration/heartbeat run in a background task (`NodePresenceManager`);
-  startup never blocks on the SERVER, and a missing SERVER only logs a
-  warning — local LLM + tools keep working, retry happens next cycle.
+  startup never blocks on the SERVER, and a missing SERVER or token only logs
+  a warning — local LLM + tools keep working, retry happens next cycle.
 - No inbound endpoint is invented: IP/port are announced only when
-  `JARVIS_NODE_ADVERTISE_IP` / `JARVIS_NODE_ADVERTISE_PORT` are set.
+  `JARVIS_NODE_ADVERTISE_IP` / `JARVIS_NODE_ADVERTISE_PORT` are set, but they
+  remain telemetry; gateway routing uses the trusted descriptor endpoint.
 - Presence is infrastructure, not an LLM tool: the LLM cannot control the
   heartbeat or change network configuration.
 
@@ -188,8 +194,9 @@ fonte de verdade com central state desabilitado (padrão em testes/dev).
   (create/resolve/consume atômico single-use/pending/cleanup); single-use,
   session binding, expiry, approved/denied e `remaining_calls` preservados.
 - **Gateway**: com `node_role=SERVER`, `POST /api/chat/send|/stream` encaminha
-  a um CORE elegível (type CORE + capability LLM + ONLINE/READY + ip/porta via
-  `DeviceRegistry`); sem CORE → HTTP 503 explícito, nunca resposta inventada.
+  a um CORE elegível (descriptor confiável CORE/LLM + presença ONLINE/READY no
+  `DeviceRegistry`); o endpoint vem de `JARVIS_TRUSTED_DEVICES`, não do SQLite;
+  sem CORE → HTTP 503 explícito, nunca resposta inventada.
 - **Compute interno**: `POST /internal/chat/send|/stream` (auth obrigatória,
   recusado em role SERVER) reutiliza exatamente o Orchestrator; proxy SSE
   byte a byte, sem tarefas órfãs. LLM pesado nunca roda no SERVER.

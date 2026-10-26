@@ -128,7 +128,7 @@ Esta visão não altera o escopo da fase atual nem antecipa a implementação de
 ### Ponte CORE ↔ SERVER + Presença (Em operação)
 - [x] `RemoteNodeClient` — transporte HTTP CORE → SERVER (`/health`, `/tools`, `/tools/execute`), erros padronizados.
 - [x] `remote_server_tool` — proxy controlado: somente tools SHARED, `confirmed=False`, LOCAL_ONLY sempre bloqueado.
-- [x] `NodePresenceManager` — auto-registro (`POST /api/devices/`) + heartbeat (`POST /api/devices/heartbeat`) a cada 30s (configurável via `JARVIS_SERVER_HEARTBEAT_INTERVAL`).
+- [x] `NodePresenceManager` — auto-registro autenticado (`POST /api/devices/`) + heartbeat (`POST /api/devices/heartbeat`) a cada 30s (configurável via `JARVIS_SERVER_HEARTBEAT_INTERVAL`); ambos exigem Bearer compartilhado + `X-Device-Token` individual.
 - [x] SERVER offline não impede o funcionamento local do Core (Ollama + tools locais); retry no próximo ciclo, sem retry agressivo.
 - [x] IP/porta anunciados somente via `JARVIS_NODE_ADVERTISE_IP` / `JARVIS_NODE_ADVERTISE_PORT` (nenhum endpoint de entrada inventado).
 - [x] Task Bridge (`DistributedTaskClient` + 7 métodos no `RemoteNodeClient`): Core cria/consulta/atualiza/completa/falha/cancela/pausa/retoma tasks persistidas no SERVER (`device_id="jarvis-core"`). `PATCH error` traduzido para o histórico `errors` (sem coluna nova, sem schema change). Lifecycle apenas — sem worker/scheduler/queue.
@@ -160,7 +160,7 @@ SERVER = control plane / source of truth. CORE = compute plane (Orchestrator, LL
 - [x] Confirmações centrais: tabela `confirmations` + `/api/confirmations/*` com consume atômico, single-use, session binding, expiry e `remaining_calls`.
 - [x] Gateway: em `node_role=SERVER`, `POST /api/chat/send|stream` encaminha a CORE elegível; sem CORE → HTTP 503 explícito, sem mock e sem resposta inventada.
 - [x] Compute interno: `POST /internal/chat/send|stream` com node auth, recusado em role SERVER, reutilizando o Orchestrator.
-- [x] Descoberta do CORE via `DeviceRegistry`.
+- [x] Seleção de CORE via presença no `DeviceRegistry` + descriptor confiável (`JARVIS_TRUSTED_DEVICES`); endpoint não vem do SQLite.
 - [x] Gemini via SERVER: chave somente no SERVER; relay autenticado; CORE nunca recebe ou armazena a chave Gemini.
 - [x] Falhas centrais são explícitas quando `CENTRAL_STATE_REQUIRED=true`.
 - [x] Arquitetura preparada para futuro acesso externo seguro sem exposição pública.

@@ -37,6 +37,20 @@ O sistema adota estritamente a política de 3 cores definida nas diretrizes do p
 
 * Todas as rotas de gerenciamento e ferramentas do `server/` exigem autenticação via Bearer Token / API Key com validação em tempo constante (`hmac.compare_digest`).
 
+### Identidade de Dispositivos (Patch 1A)
+
+* `/api/devices` exige o Bearer do nó e um `X-Device-Token` individual em
+  development e production.
+* O SERVER mantém `JARVIS_TRUSTED_DEVICES` com o token, tipo, capabilities e
+  endpoint confiável de cada dispositivo; o CORE recebe apenas o seu
+  `JARVIS_DEVICE_TOKEN`.
+* `device_id`, tipo, capabilities, IP e porta enviados pelo cliente não são
+  autoridade. O registro usa o descriptor do SERVER.
+* O gateway só encaminha para o endpoint confiável configurado no SERVER e
+  retorna HTTP 503 sem CORE provisionado; não há fallback local.
+* Endpoints confiáveis aceitam somente origins HTTP(S), sem credenciais,
+  caminho, query, fragment ou porta fora da faixa.
+
 ---
 
 ## 4. Confirmação — Regras de Segurança
