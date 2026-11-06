@@ -263,6 +263,32 @@ Acesso externo (fora de casa) continua futuro e não implementado: quando existi
 - [ ] Voz deve utilizar o mesmo JARVIS central, memória, Goals e segurança.
 - [ ] Não criar uma segunda inteligência paralela.
 
+## Fase 16.5 — Inteligência Operacional Local e Otimização do CORE
+
+**Status:** Planejada  
+**Dependência:** Fase 16 concluída.
+
+**Objetivo:** desenvolver uma camada de inteligência operacional local que permita ao J.A.R.V.I.S. compreender intenções, descobrir ferramentas, resolver entidades, executar operações simples sem depender do LLM e produzir respostas naturais e contextualizadas.
+
+A fase também busca reduzir o consumo de tokens e a latência, aprimorar o carregamento de ferramentas, fortalecer o funcionamento offline e preservar integralmente as políticas de segurança e a separação entre SERVER e CORE.
+
+**Principais frentes:**
+- Otimização do catálogo e Registry de ferramentas.
+- Compreensão local de intenções (NLU).
+- Descoberta e seleção contextual de ferramentas.
+- Carregamento progressivo de esquemas e otimização de tokens.
+- Resolução de entidades e capacidades.
+- Fast Path para execução sem LLM.
+- Geração de respostas naturais.
+- Contexto conversacional e continuidade.
+- Otimização do runtime e concorrência.
+- Inteligência offline e gerenciamento de modelos locais.
+- Segurança, observabilidade e validação de desempenho.
+
+**Especificação técnica completa:** [PHASE_16_5.md](PHASE_16_5.md).
+
+A implementação deverá seguir as frentes, dependências, interfaces, procedimentos, testes obrigatórios e critérios de aceitação definidos na especificação técnica. A conclusão da fase dependerá da validação efetiva de todos os requisitos.
+
 #### ⚠️ Planned extensions usando voz (futuro)
 - [ ] Entrega falada de compromissos/notificações proativas quando existirem (A4, J3); voz como perna de entrega, sem lógica própria de agendamento.
 
