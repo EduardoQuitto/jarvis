@@ -1727,3 +1727,42 @@ O J.A.R.V.I.S. deixa de depender do LLM como intermediário obrigatório para op
 O LLM permanece como componente de raciocínio avançado, e não como requisito obrigatório para cada interação.
 
 A Fase 16.5 deverá estabelecer essa base para futuras evoluções de autonomia, memória, planejamento, especialização de agentes e integração com os recursos do ambiente.
+
+
+
+## 10. Instruções obrigatórias para implementação por agentes de desenvolvimento
+
+Esta especificação deverá ser considerada a referência técnica principal para a implementação da Fase 16.5.
+
+Antes de modificar qualquer código, o agente deverá:
+
+1. Ler integralmente esta especificação, o `ROADMAP.md`, o `AGENTS.md`, o `SECURITY.md` e a documentação relacionada aos componentes envolvidos.
+2. Inspecionar a implementação atual e confirmar se os arquivos, contratos, interfaces e comportamentos descritos continuam correspondendo ao repositório.
+3. Identificar divergências entre esta especificação e o código existente, apresentando os ajustes arquiteturais necessários antes de prosseguir.
+4. Elaborar um plano de execução baseado nas dependências e na ordem das etapas definidas nesta fase.
+
+Durante a implementação:
+
+- Desenvolver uma frente por vez, respeitando suas dependências.
+- Não avançar para uma frente dependente enquanto os requisitos da etapa anterior não estiverem validados.
+- Preservar a arquitetura existente sempre que possível.
+- Não criar componentes duplicados ou mecanismos paralelos às responsabilidades existentes.
+- Não contornar políticas de segurança, confirmações ou mecanismos oficiais de execução.
+- Criar e executar testes para cada componente implementado.
+- Executar testes de integração e regressão conforme as alterações realizadas.
+- Não remover, enfraquecer ou modificar testes apenas para obter aprovação da suíte.
+- Documentar decisões arquiteturais e justificar desvios desta especificação.
+- Registrar métricas e resultados de desempenho antes e depois das otimizações.
+
+Ao concluir cada frente, registrar:
+
+- Implementações realizadas.
+- Arquivos criados e modificados.
+- Testes executados e respectivos resultados.
+- Critérios de aceitação atendidos.
+- Problemas identificados.
+- Pendências e dependências restantes.
+
+A fase somente poderá ser declarada concluída após todas as frentes e critérios gerais de aceitação terem sido validados.
+
+**Importante:** esta especificação define os requisitos e resultados esperados, mas não autoriza o agente a presumir que a implementação atual possui exatamente a estrutura descrita. O código existente deverá ser tratado como fonte de verdade para decisões de integração.
